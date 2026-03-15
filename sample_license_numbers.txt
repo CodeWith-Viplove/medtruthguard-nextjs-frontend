@@ -1,0 +1,9 @@
+Sample Medical License Numbers for Testing:
+
+1. MHMC/2020/102938
+2. KMC/2015/009123
+3. DMC/2022/456781
+4. MMC/2018/334455
+5. GCM/2021/778891
+
+Note: These are formatted according to the standard STATE/YEAR/NUMBER pattern used in the registration form.
