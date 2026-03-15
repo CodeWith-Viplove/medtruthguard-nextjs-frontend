@@ -303,6 +303,8 @@ const DetailPanel = ({ item, onClose, onBackToChat }) => {
   );
 };
 
+export const dynamic = "force-dynamic";
+
 // ─── Main Page ───────────────────────────────────────────────────────────────────
 export default function DoctorResponsesPage() {
   const router = useRouter();
@@ -319,9 +321,11 @@ export default function DoctorResponsesPage() {
   // ── Build items from localStorage (pending consults saved from chat page)
   const getStoredItems = () => {
     let stored = [];
-    try {
-      stored = JSON.parse(localStorage.getItem("medtruth_consultations") || "[]");
-    } catch (e) { }
+    if (typeof window !== "undefined") {
+      try {
+        stored = JSON.parse(localStorage.getItem("medtruth_consultations") || "[]");
+      } catch (e) { }
+    }
     
     // Filter by citizenId if available. 
     // If citizenId exists in storage, it MUST match the current session user.

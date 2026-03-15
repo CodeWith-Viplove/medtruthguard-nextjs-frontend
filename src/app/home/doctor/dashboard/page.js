@@ -91,6 +91,8 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
+export const dynamic = "force-dynamic";
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DoctorDashboard() {
   const router = useRouter();
