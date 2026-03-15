@@ -395,6 +395,8 @@ const DetailPanel = ({ item, onRespond, onBackToDashboard }) => {
   );
 };
 
+export const dynamic = "force-dynamic";
+
 // ─── Main Page ───────────────────────────────────────────────────────────────────
 export default function CitizenQueryPage() {
   const router = useRouter();

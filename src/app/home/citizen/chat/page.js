@@ -244,6 +244,8 @@ const ChatMessage = ({ message, onConsult }) => {
   );
 };
 
+export const dynamic = "force-dynamic";
+
 // ─── Main Chat Page ─────────────────────────────────────────────────────────────
 export default function ChatPage() {
   const router = useRouter();
@@ -415,24 +417,26 @@ export default function ChatPage() {
     }
 
     // Also persist to localStorage for the doctor-responses page to pick up
-    const consultation = {
-      id: Date.now(),
-      doctor: consultModal.doctor,
-      query: consultModal.queryText,
-      queryId: consultModal.queryId,
-      citizenId: citizenId, // Save the citizen ID
-      note: consultNote,
-      patientContext,
-      sentAt: new Date().toLocaleString(),
-      status: "pending",
-      read: false,
-      urgency: "moderate",
-      aiResponse: consultModal.aiResponse || null,
-    };
-    try {
-      const existing = JSON.parse(localStorage.getItem("medtruth_consultations") || "[]");
-      localStorage.setItem("medtruth_consultations", JSON.stringify([consultation, ...existing]));
-    } catch (e) { }
+    if (typeof window !== "undefined") {
+      const consultation = {
+        id: Date.now(),
+        doctor: consultModal.doctor,
+        query: consultModal.queryText,
+        queryId: consultModal.queryId,
+        citizenId: citizenId, // Save the citizen ID
+        note: consultNote,
+        patientContext,
+        sentAt: new Date().toLocaleString(),
+        status: "pending",
+        read: false,
+        urgency: "moderate",
+        aiResponse: consultModal.aiResponse || null,
+      };
+      try {
+        const existing = JSON.parse(localStorage.getItem("medtruth_consultations") || "[]");
+        localStorage.setItem("medtruth_consultations", JSON.stringify([consultation, ...existing]));
+      } catch (e) { }
+    }
     setConsultSent(true);
     setTimeout(() => {
       setConsultModal(null);
