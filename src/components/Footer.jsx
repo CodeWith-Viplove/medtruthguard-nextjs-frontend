@@ -11,7 +11,7 @@ const Footer = () => {
           <span className="font-semibold text-foreground">MedTruth Guard</span>
         </div>
         <p className="text-center text-xs sm:text-sm">
-          © 2025 MedTruth Guard. All rights reserved.
+          © 2026 MedTruth Guard. All rights reserved.
         </p>
       </div>
     </footer>

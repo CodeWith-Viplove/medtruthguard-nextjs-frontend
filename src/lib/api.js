@@ -16,16 +16,34 @@ const BASE_URL =
 // ─── Custom error class ───────────────────────────────────────────────────────
 export class ApiError extends Error {
     constructor(status, body) {
-        const message =
-            body?.detail?.message || body?.detail || body?.message || `API Error ${status}`;
-        super(typeof message === "string" ? message : JSON.stringify(message));
+        // Handle common FastAPI/Python backend error structures
+        let message = "An unexpected error occurred.";
+        
+        if (body?.detail) {
+            if (typeof body.detail === "string") {
+                message = body.detail;
+            } else if (body.detail.error) {
+                // Handle structure: { detail: { error: "...", raw_output: "..." } }
+                message = body.detail.error;
+            } else if (body.detail.message) {
+                message = body.detail.message;
+            } else {
+                message = JSON.stringify(body.detail);
+            }
+        } else if (body?.message) {
+            message = body.message;
+        } else {
+            message = `API Error ${status}`;
+        }
+
+        super(message);
         this.name = "ApiError";
         this.status = status;
         this.body = body;
     }
 }
 
-// ─── Internal helper ──────────────────────────────────────────────────────────
+// ─── Internal helpers ─────────────────────────────────────────────────────────
 async function request(method, path, body = null) {
     const opts = {
         method,
@@ -51,6 +69,27 @@ async function request(method, path, body = null) {
                 retryAfter: parseInt(retryAfter, 10),
             });
         }
+        throw new ApiError(res.status, json);
+    }
+
+    return json;
+}
+
+async function multipartRequest(method, path, formData) {
+    const res = await fetch(`${BASE_URL}${path}`, {
+        method,
+        body: formData,
+        // Browser sets Content-Type to multipart/form-data with boundary automatically
+    });
+
+    let json;
+    try {
+        json = await res.json();
+    } catch {
+        json = null;
+    }
+
+    if (!res.ok) {
         throw new ApiError(res.status, json);
     }
 
@@ -132,6 +171,49 @@ export async function getQuery(queryId) {
  */
 export async function getCitizenQueries(citizenId) {
     return request("GET", `/medical/queries/citizen/${citizenId}`);
+}
+
+// ─── Medical Image Analysis ───
+
+/**
+ * Analyze ECG image.
+ * POST /medical-image/analyze/ecg
+ */
+export async function analyzeEcg(formData) {
+    return multipartRequest("POST", "/medical-image/analyze/ecg", formData);
+}
+
+/**
+ * Analyze X-ray image.
+ * POST /medical-image/analyze/xray
+ */
+export async function analyzeXray(formData) {
+    return multipartRequest("POST", "/medical-image/analyze/xray", formData);
+}
+
+/**
+ * Get a single image analysis.
+ * GET /medical-image/analysis/{analysis_id}
+ */
+export async function getImageAnalysis(analysisId) {
+    return request("GET", `/medical-image/analysis/${analysisId}`);
+}
+
+/**
+ * Get all image analyses for a citizen.
+ * GET /medical-image/analyses/citizen/{citizen_id}
+ */
+export async function getCitizenImageAnalyses(citizenId, type = null) {
+    const path = `/medical-image/analyses/citizen/${citizenId}${type ? `?analysis_type=${type}` : ""}`;
+    return request("GET", path);
+}
+
+/**
+ * Health check for medical image analysis service.
+ * GET /medical-image/health
+ */
+export async function getImageAnalysisHealth() {
+    return request("GET", "/medical-image/health");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -18,7 +18,7 @@ const ReadyToVerifySection = ({ onGetStarted }) => {
           <Button
             size="lg"
             variant="outline"
-            className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-transparent px-8 text-sm font-semibold hover:bg-white/10"
+            className="inline-flex items-center gap-2 rounded-md border border-white/80 bg-transparent px-8 text-sm font-semibold hover:bg-white/10"
             style={{ color: "white" }}
             onClick={onGetStarted}
           >

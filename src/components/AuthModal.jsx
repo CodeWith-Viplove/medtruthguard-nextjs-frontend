@@ -238,7 +238,7 @@ const AuthModal = ({ open, onClose, initialRole, onAuthenticated }) => {
             <Button
               type="submit"
               size="lg"
-              className="mt-1 w-full rounded-full text-sm font-semibold"
+              className="mt-1 w-full rounded-lg text-sm font-semibold"
               style={{ backgroundColor: "#0084d1", color: "white" }}
             >
               Sign Up
@@ -291,7 +291,7 @@ const AuthModal = ({ open, onClose, initialRole, onAuthenticated }) => {
             <Button
               type="submit"
               size="lg"
-              className="mt-1 w-full rounded-full text-sm font-semibold"
+              className="mt-1 w-full rounded-lg text-sm font-semibold"
               style={{ backgroundColor: "#0084d1", color: "white" }}
             >
               Sign In
@@ -344,7 +344,7 @@ const AuthModal = ({ open, onClose, initialRole, onAuthenticated }) => {
             <Button
               type="submit"
               size="lg"
-              className="mt-1 w-full rounded-full text-sm font-semibold"
+              className="mt-1 w-full rounded-lg text-sm font-semibold"
               style={{ backgroundColor: "#0084d1", color: "white" }}
             >
               Sign In
@@ -452,7 +452,7 @@ const AuthModal = ({ open, onClose, initialRole, onAuthenticated }) => {
             <Button
               type="submit"
               size="lg"
-              className="mt-1 w-full rounded-full text-sm font-semibold"
+              className="mt-1 w-full rounded-lg text-sm font-semibold"
               style={{ backgroundColor: "#0084d1", color: "white" }}
             >
               Submit for Verification

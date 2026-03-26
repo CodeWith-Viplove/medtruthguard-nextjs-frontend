@@ -805,7 +805,7 @@ export default function ChatPage() {
 
           {/* Input Area */}
           <div className="bg-white border-t border-[#e8ecf4] py-[14px] px-[22px] shadow-[0_-2px_12px_rgba(0,0,0,0.04)]">
-            <div className="flex items-end gap-[10px] bg-[#f8faff] border-2 border-slate-200 rounded-[14px] py-[10px] px-[14px] transition-all duration-200 focus-within:border-[#2793ef] focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
+            <div className="flex items-center gap-[10px] bg-[#f8faff] border-2 border-slate-200 rounded-[14px] py-[10px] px-[14px] transition-all duration-200 focus-within:border-[#2793ef] focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
               <textarea
                 ref={textareaRef}
                 className="flex-1 bg-transparent border-none outline-none resize-none text-[14px] text-slate-800 leading-relaxed max-h-[120px] min-h-[22px] font-inherit placeholder:text-slate-400 h-auto"

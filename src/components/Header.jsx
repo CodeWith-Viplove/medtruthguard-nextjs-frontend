@@ -24,7 +24,7 @@ const Header = ({ onCitizenClick, onDoctorClick }) => {
           <Button
             size="lg"
             variant="outline"
-            className="rounded-full border-sky-200 px-6 text-sm font-semibold text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+            className="rounded-md border-sky-200 px-6 text-sm font-semibold text-sky-700 hover:border-sky-300 hover:bg-sky-50"
             onClick={onCitizenClick}
           >
             Citizen
@@ -32,7 +32,7 @@ const Header = ({ onCitizenClick, onDoctorClick }) => {
 
           <Button
             size="lg"
-            className="rounded-full px-6 text-sm font-semibold"
+            className="rounded-md px-6 text-sm font-semibold"
             style={{ backgroundColor: "#0084d1", color: "white" }}
             onClick={onDoctorClick}
           >
