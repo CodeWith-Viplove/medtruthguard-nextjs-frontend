@@ -31,13 +31,13 @@ const LandingPage = ({ onAuthenticated }) => {
         onDoctorClick={() => router.push('/login/doctor')}
       />
       <HeroSection
-        onStartVerify={() => openAuth('citizen')}
-        onJoinDoctor={() => openAuth('doctor')}
+        onStartVerify={() => router.push('/login/citizen')}
+        onJoinDoctor={() => router.push('/login/doctor')}
       />
       <StatsSection />
       <WhyTrustSection />
       <HowItWorksSection />
-      <ReadyToVerifySection onGetStarted={() => openAuth('citizen')} />
+      <ReadyToVerifySection onGetStarted={() => router.push('/login/citizen')} />
       <Footer />
       <AuthModal
         open={authOpen}
