@@ -270,11 +270,133 @@ const DetailPanel = ({ item, onClose, onBackToChat }) => {
                     </div>
                     <p className="text-[13px] text-[#334155] leading-[1.6] m-0">{item.verification.justification}</p>
                   </div>
-                  <div className="flex flex-wrap gap-[6px] py-[10px] px-[16px] border-t border-[#f1f5f9]">
-                    {(item.verification.sources || []).map((s, i) => (
-                      <span key={i} className="text-[11px] font-medium py-[3px] px-[10px] rounded-[12px] bg-[#eff6ff] text-[#3b82f6] border border-[#bfdbfe]">{s}</span>
-                    ))}
-                  </div>
+                  {/* ── VERIFICATION SOURCES ── */}
+                  {(() => {
+                    const verification = item.verification || {};
+                    const sources = verification.verification_sources;
+                    const citations = verification.sources || [];
+                    const pmids = (item.aiResponse || {}).pmids || [];
+
+                    if (!sources && citations.length === 0 && pmids.length === 0) return null;
+
+                    const badgeColors = [
+                      { bg: "bg-[#f0f9ff]", text: "text-[#0369a1]", border: "border-[#e0f2fe]", dot: "bg-[#0369a1]" }, // Blue
+                      { bg: "bg-[#f0fdf4]", text: "text-[#15803d]", border: "border-[#dcfce7]", dot: "bg-[#15803d]" }, // Green
+                      { bg: "bg-[#fdf4ff]", text: "text-[#a21caf]", border: "border-[#fae8ff]", dot: "bg-[#a21caf]" }, // Fuchsia
+                      { bg: "bg-[#ffedd5]", text: "text-[#c2410c]", border: "border-[#fed7aa]", dot: "bg-[#c2410c]" }, // Orange
+                      { bg: "bg-[#fce7f3]", text: "text-[#be185d]", border: "border-[#fbcfe8]", dot: "bg-[#be185d]" }, // Pink
+                      { bg: "bg-[#f3f4f6]", text: "text-[#374151]", border: "border-[#e5e7eb]", dot: "bg-[#374151]" }, // Gray
+                      { bg: "bg-[#ecfeff]", text: "text-[#0f766e]", border: "border-[#ccfbf1]", dot: "bg-[#0f766e]" }, // Cyan
+                    ];
+
+                    const getLinkText = (link) => {
+                      try {
+                        const url = new URL(link);
+                        let domain = url.hostname.replace(/^www\./, '');
+                        let path = url.pathname === '/' ? '' : url.pathname;
+                        if (path.endsWith('/')) path = path.slice(0, -1);
+                        let text = domain + path;
+                        return text.length > 40 ? text.substring(0, 40) + '...' : text;
+                      } catch (e) {
+                        const clean = link.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+                        return clean.length > 40 ? clean.substring(0, 40) + '...' : clean;
+                      }
+                    };
+
+                    let pubmedLinks = sources?.pubmed?.links || [];
+                    let whoLinks = sources?.who?.links || [];
+
+                    if (pubmedLinks.length === 0) {
+                      pmids.forEach(id => {
+                        pubmedLinks.push(`https://pubmed.ncbi.nlm.nih.gov/${id}/`);
+                      });
+                      citations.forEach(link => {
+                        if (typeof link === 'string' && link.includes('pubmed') && !pubmedLinks.includes(link)) {
+                          pubmedLinks.push(link);
+                        }
+                      });
+                    }
+
+                    if (whoLinks.length === 0) {
+                      citations.forEach(link => {
+                        if (typeof link === 'string' && link.includes('who.int') && !whoLinks.includes(link)) {
+                          whoLinks.push(link);
+                        }
+                      });
+                    }
+
+                    if (pubmedLinks.length === 0 && whoLinks.length === 0 && citations.length === 0) return null;
+
+                    return (
+                      <div className="py-[16px] px-[16px] border-t border-[#f1f5f9] bg-slate-50/50">
+                        <div className="text-[12px] font-bold text-slate-800 mb-[14px]">
+                          Verification Sources
+                        </div>
+
+                        <div className="flex flex-col gap-[16px]">
+                          {/* PubMed Sources */}
+                          {pubmedLinks.length > 0 && (
+                            <div>
+                              <div className="text-[11.5px] font-semibold text-slate-700 mb-[8px]">
+                                PubMed References:
+                              </div>
+                              <div className="flex flex-wrap gap-[8px]">
+                                {pubmedLinks.map((link, i) => {
+                                  const c = badgeColors[i % badgeColors.length];
+                                  return (
+                                    <a key={i} href={link} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-[6px] text-[11.5px] ${c.text} font-medium transition-all ${c.bg} py-[5px] px-[12px] rounded-full border ${c.border} hover:opacity-80 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]`}>
+                                      <span className={`w-[5px] h-[5px] rounded-full ${c.dot}`} />
+                                      {getLinkText(link)}
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* WHO Sources */}
+                          {whoLinks.length > 0 && (
+                            <div>
+                              <div className="text-[11.5px] font-semibold text-slate-700 mb-[8px]">
+                                WHO References:
+                              </div>
+                              <div className="flex flex-wrap gap-[8px]">
+                                {whoLinks.map((link, i) => {
+                                  const c = badgeColors[(i + 2) % badgeColors.length];
+                                  return (
+                                    <a key={i} href={link} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-[6px] text-[11.5px] ${c.text} font-medium transition-all ${c.bg} py-[5px] px-[12px] rounded-full border ${c.border} hover:opacity-80 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]`}>
+                                      <span className={`w-[5px] h-[5px] rounded-full ${c.dot}`} />
+                                      {getLinkText(link)}
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Other/External Sources fallback */}
+                          {pubmedLinks.length === 0 && whoLinks.length === 0 && citations.length > 0 && (
+                            <div>
+                              <div className="text-[11.5px] font-semibold text-slate-700 mb-[8px]">
+                                External References:
+                              </div>
+                              <div className="flex flex-wrap gap-[8px]">
+                                {citations.map((link, i) => {
+                                  const c = badgeColors[(i + 4) % badgeColors.length];
+                                  return (
+                                    <a key={i} href={typeof link === 'string' ? link : '#'} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-[6px] text-[11.5px] ${c.text} font-medium transition-all ${c.bg} py-[5px] px-[12px] rounded-full border ${c.border} hover:opacity-80 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]`}>
+                                      <span className={`w-[5px] h-[5px] rounded-full ${c.dot}`} />
+                                      {typeof link === 'string' ? getLinkText(link) : 'Source Link'}
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {item.verification.patientContextStr && (
                     <div className="flex gap-[10px] items-center py-[12px] px-[16px] bg-[#f8faff] border-t border-[#f1f5f9]">
                       <User size={14} className="text-[#3b82f6] shrink-0" />
@@ -317,6 +439,7 @@ export default function DoctorResponsesPage() {
   const [allItems, setAllItems] = useState([]);
 
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingApi, setLoadingApi] = useState(false);
 
   // ── Build items from localStorage (pending consults saved from chat page)
   const getStoredItems = () => {
@@ -326,14 +449,14 @@ export default function DoctorResponsesPage() {
         stored = JSON.parse(localStorage.getItem("medtruth_consultations") || "[]");
       } catch (e) { }
     }
-    
+
     // Filter by citizenId if available. 
     // If citizenId exists in storage, it MUST match the current session user.
     // If it doesn't exist (legacy), we only show it if the user is not logged in (anonymous).
     return stored
       .filter(c => {
         if (c.citizenId) return String(c.citizenId) === String(citizenId);
-        return !citizenId || citizenId === "anonymous"; 
+        return !citizenId || citizenId === "anonymous";
       })
       .map(c => ({
         ...c,
@@ -377,6 +500,7 @@ export default function DoctorResponsesPage() {
             safeLabel: "Doctor Reviewed & Approved",
             justification: cr.doctor_view || "Response has been reviewed by a medical professional.",
             sources: (aiResp?.citations || []).map(c => typeof c === "string" ? c : c.title || ""),
+            verification_sources: aiResp?.verification_sources || null,
             patientContextStr: null,
           } : null,
           tags: isResponded ? ["Doctor Reviewed", "AI Verified"] : ["Awaiting Doctor"],
@@ -391,11 +515,14 @@ export default function DoctorResponsesPage() {
   // ── Fetch consultations from backend + localStorage
   const fetchAll = async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
+    else if (allItems.length === 0) setLoadingApi(true);
+
     const enriched = getStoredItems();
 
     if (!citizenId) {
       setAllItems([...enriched]);
       if (isManualRefresh) setRefreshing(false);
+      setLoadingApi(false);
       return;
     }
 
@@ -415,6 +542,7 @@ export default function DoctorResponsesPage() {
       setAllItems([...enriched]);
     } finally {
       if (isManualRefresh) setRefreshing(false);
+      setLoadingApi(false);
     }
   };
 
@@ -533,60 +661,97 @@ export default function DoctorResponsesPage() {
 
         {/* ── Card List ── */}
         <div className="flex-1 overflow-y-auto py-[20px] px-[28px] max-md:py-[12px] max-md:px-[14px] flex flex-col gap-[12px] bg-white scrollbar-thin scrollbar-thumb-[#cbd5e1] scrollbar-track-transparent">
-          {filtered.length === 0 ? (
+
+          {/* Skeleton loader while fetching */}
+          {loadingApi && (
+            <>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="bg-white border-[1.5px] border-[#e8ecf4] rounded-[14px] py-[18px] px-[20px] flex items-start gap-[14px] animate-pulse">
+                  {/* Avatar skeleton */}
+                  <div className="w-[44px] h-[44px] rounded-full bg-slate-200 shrink-0" />
+                  <div className="flex-1 min-w-0 flex flex-col gap-[8px]">
+                    {/* Top row */}
+                    <div className="flex items-center justify-between gap-[8px]">
+                      <div className="h-[14px] w-[120px] bg-slate-200 rounded-full" />
+                      <div className="flex gap-[5px]">
+                        <div className="h-[20px] w-[90px] bg-slate-100 rounded-full" />
+                        <div className="h-[20px] w-[60px] bg-slate-100 rounded-full" />
+                      </div>
+                    </div>
+                    {/* Doctor info row */}
+                    <div className="h-[12px] w-[180px] bg-slate-100 rounded-full" />
+                    {/* Query text */}
+                    <div className="h-[13px] w-full bg-sky-50/50 rounded-full" />
+                    <div className="h-[13px] w-[70%] bg-sky-50/50 rounded-full" />
+                    {/* Footer */}
+                    <div className="flex items-center gap-[10px] mt-[4px]">
+                      <div className="h-[11px] w-[80px] bg-slate-100 rounded-full" />
+                      <div className="h-[11px] w-[60px] bg-slate-100 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* Empty state */}
+          {!loadingApi && filtered.length === 0 && (
             <div className="flex flex-col items-center justify-center gap-[8px] py-[60px] px-[20px] text-center">
-              <div className="w-[56px] h-[56px] bg-gradient-to-br from-[#dbeafe] to-[#ede9fe] rounded-[16px] flex items-center justify-center"><FileText size={28} color="#6366f1" /></div>
+              <div className="w-[56px] h-[56px] bg-gradient-to-br from-[#dbeafe] to-[#ede9fe] rounded-[16px] flex items-center justify-center">
+                <FileText size={28} color="#6366f1" />
+              </div>
               <div className="text-[15px] font-bold text-[#0f172a]">No responses found</div>
               <div className="text-[12.5px] text-[#94a3b8] max-w-[320px]">Try adjusting your search or filters</div>
             </div>
-          ) : (
-            filtered.map(item => {
-              const initials = item.doctor.name
-                .split(" ")
-                .filter(w => w !== "Dr.")
-                .map(w => w[0])
-                .join("")
-                .slice(0, 2);
-              return (
-                <div
-                  key={item.id}
-                  className={`group bg-white border-[1.5px] border-[#e8ecf4] rounded-[14px] py-[18px] px-[20px] cursor-pointer transition-all duration-200 flex items-start gap-[14px] relative hover:border-[#bfdbfe] hover:shadow-[0_4px_16px_rgba(59,130,246,0.08)] hover:-translate-y-[1px] ${selectedId === item.id ? "border-[#3b82f6] bg-[#f8faff] shadow-[0_4px_16px_rgba(59,130,246,0.12)]" : ""} ${!item.read ? "before:content-[''] before:absolute before:top-1/2 before:-left-[1px] before:-translate-y-1/2 before:w-[3px] before:h-[28px] before:bg-[#3b82f6] before:rounded-[0_3px_3px_0]" : ""}`}
-                  onClick={() => handleSelect(item.id)}
-                >
-                  <div className="w-[44px] h-[44px] rounded-full bg-[#2793ef] text-white text-[14px] font-bold flex items-center justify-center shrink-0">{initials}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-[8px] mb-[4px]">
-                      <span className="text-[14px] font-bold text-[#0f172a]">{item.doctor.name}</span>
-                      <div className="flex gap-[5px] shrink-0">
-                        <span className={`text-[10px] font-semibold py-[3px] px-[8px] rounded-[12px] uppercase tracking-[0.03em] ${item.status === "pending" ? "bg-[#fffbeb] text-[#d97706]" : "bg-[#ecfdf5] text-[#059669]"}`}>
-                          {item.status === "pending" ? "⏳ Waiting for Doctor" : "✓ Responded"}
-                        </span>
-                        <span className={`text-[10px] font-semibold py-[3px] px-[8px] rounded-[12px] uppercase tracking-[0.03em] ${item.urgency === "high" ? "bg-[#fef2f2] text-[#dc2626]" : item.urgency === "moderate" ? "bg-[#fff7ed] text-[#ea580c]" : "bg-[#f0fdf4] text-[#16a34a]"}`}>
-                          {item.urgency === "high" ? "⚡ Urgent" : item.urgency === "moderate" ? "Moderate" : "Routine"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-[12px] text-[#3b82f6] font-medium mb-[6px]">
-                      {item.doctor.specialty} · {item.doctor.hospital || "Verified Doctor"}
-                    </div>
-                    <div className="text-[13px] text-[#475569] leading-relaxed overflow-hidden line-clamp-2">{item.query}</div>
-                    <div className="flex items-center gap-[12px] mt-[8px]">
-                      <span className="flex items-center gap-[4px] text-[11px] text-[#94a3b8]">
-                        <Clock size={11} />
-                        {item.responseDate || item.consultDate || "Recently"}
+          )}
+
+          {/* Result list */}
+          {!loadingApi && filtered.length > 0 && filtered.map(item => {
+            const initials = item.doctor.name
+              .split(" ")
+              .filter(w => w !== "Dr.")
+              .map(w => w[0])
+              .join("")
+              .slice(0, 2);
+            return (
+              <div
+                key={item.id}
+                className={`group bg-white border-[1.5px] border-[#e8ecf4] rounded-[14px] py-[18px] px-[20px] cursor-pointer transition-all duration-200 flex items-start gap-[14px] relative hover:border-[#bfdbfe] hover:shadow-[0_4px_16px_rgba(59,130,246,0.08)] hover:-translate-y-[1px] ${selectedId === item.id ? "border-[#3b82f6] bg-[#f8faff] shadow-[0_4px_16px_rgba(59,130,246,0.12)]" : ""} ${!item.read ? "before:content-[''] before:absolute before:top-1/2 before:-left-[1px] before:-translate-y-1/2 before:w-[3px] before:h-[28px] before:bg-[#3b82f6] before:rounded-[0_3px_3px_0]" : ""}`}
+                onClick={() => handleSelect(item.id)}
+              >
+                <div className="w-[44px] h-[44px] rounded-full bg-[#2793ef] text-white text-[14px] font-bold flex items-center justify-center shrink-0">{initials}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-[8px] mb-[4px]">
+                    <span className="text-[14px] font-bold text-[#0f172a]">{item.doctor.name}</span>
+                    <div className="flex gap-[5px] shrink-0">
+                      <span className={`text-[10px] font-semibold py-[3px] px-[8px] rounded-[12px] uppercase tracking-[0.03em] ${item.status === "pending" ? "bg-[#fffbeb] text-[#d97706]" : "bg-[#ecfdf5] text-[#059669]"}`}>
+                        {item.status === "pending" ? "⏳ Waiting for Doctor" : "✓ Responded"}
                       </span>
-                      {item.tags && item.tags.map((t, i) => (
-                        <span key={i} className="flex items-center gap-[4px] text-[11px] text-[#94a3b8] text-[#6366f1]">
-                          <ShieldCheck size={11} /> {t}
-                        </span>
-                      ))}
+                      <span className={`text-[10px] font-semibold py-[3px] px-[8px] rounded-[12px] uppercase tracking-[0.03em] ${item.urgency === "high" ? "bg-[#fef2f2] text-[#dc2626]" : item.urgency === "moderate" ? "bg-[#fff7ed] text-[#ea580c]" : "bg-[#f0fdf4] text-[#16a34a]"}`}>
+                        {item.urgency === "high" ? "⚡ Urgent" : item.urgency === "moderate" ? "Moderate" : "Routine"}
+                      </span>
                     </div>
                   </div>
-                  <ChevronRight size={16} className="text-[#cbd5e1] shrink-0 transition-colors duration-200 group-hover:text-[#3b82f6]" />
+                  <div className="text-[12px] text-[#3b82f6] font-medium mb-[6px]">
+                    {item.doctor.specialty} · {item.doctor.hospital || "Verified Doctor"}
+                  </div>
+                  <div className="text-[13px] text-[#475569] leading-relaxed overflow-hidden line-clamp-2">{item.query}</div>
+                  <div className="flex items-center gap-[12px] mt-[8px]">
+                    <span className="flex items-center gap-[4px] text-[11px] text-[#94a3b8]">
+                      <Clock size={11} />
+                      {item.responseDate || item.consultDate || "Recently"}
+                    </span>
+                    {item.tags && item.tags.map((t, i) => (
+                      <span key={i} className="flex items-center gap-[4px] text-[11px] text-[#94a3b8] text-[#6366f1]">
+                        <ShieldCheck size={11} /> {t}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              );
-            })
-          )}
+                <ChevronRight size={16} className="text-[#cbd5e1] shrink-0 transition-colors duration-200 group-hover:text-[#3b82f6]" />
+              </div>
+            );
+          })}
         </div>
 
         {/* ── Detail Modal ── */}

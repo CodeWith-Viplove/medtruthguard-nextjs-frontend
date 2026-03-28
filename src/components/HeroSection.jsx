@@ -25,7 +25,7 @@ const HeroSection = ({ onStartVerify, onJoinDoctor }) => {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
           <Button
             size="lg"
-            className="rounded-full px-8 text-sm font-semibold"
+            className="rounded-md px-8 text-sm font-semibold"
             style={{ backgroundColor: "#0084d1", color: "white" }}
             onClick={onStartVerify}
           >
@@ -35,7 +35,7 @@ const HeroSection = ({ onStartVerify, onJoinDoctor }) => {
           <Button
             size="lg"
             variant="outline"
-            className="rounded-full border-sky-200 bg-white px-7 text-sm font-semibold text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+            className="rounded-md border-sky-200 bg-white px-7 text-sm font-semibold text-sky-700 hover:border-sky-300 hover:bg-sky-50"
             onClick={onJoinDoctor}
           >
             <UserCheck className="mr-2 size-4" />

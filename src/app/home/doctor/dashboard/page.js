@@ -186,8 +186,8 @@ export default function DoctorDashboard() {
             </div>
             <div>
               <div className="text-[16px] max-md:text-[14px] font-bold text-[#0f172a]">{session?.user?.name || "Doctor"}</div>
-              <div className="text-[12px] max-md:text-[11px] text-[#64748b] mt-[1px]">{session?.user?.specialization || "Medical Professional"}</div>
-              <div className="text-[11px] max-md:text-[10px] text-[#475569] mt-[2px] flex items-center gap-[4px]">🏥 MedTruth Network</div>
+              <div className="text-[12px] max-md:text-[11px] text-[#64748b] mt-[1px]"><span>Specialization : </span>{session?.user?.specialization || "Medical Professional"}</div>
+              {/* <div className="text-[11px] max-md:text-[10px] text-[#475569] mt-[2px] flex items-center gap-[4px]">🏥 MedTruth Network</div> */}
             </div>
           </div>
           <div className="flex items-center gap-[10px] max-md:gap-[8px]">

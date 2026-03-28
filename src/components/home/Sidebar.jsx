@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Menu,
   X,
+  Activity,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -21,6 +22,12 @@ const citizenLinks = [
     href: "/home/citizen/chat",
     icon: MessageSquare,
     color: "#3b82f6",
+  },
+  {
+    label: "Medical Image Analysis",
+    href: "/home/citizen/image-analysis",
+    icon: Activity,
+    color: "#10b981",
   },
   {
     label: "Doctor Responses",
