@@ -7,23 +7,18 @@ import {
   Activity,
   ArrowLeft,
   ShieldCheck,
-  Printer,
-  Download,
   Calendar,
   Clock,
   User,
   Stethoscope,
   TrendingUp,
   AlertCircle,
-  Loader2,
   TriangleAlert,
   Scan,
 } from "lucide-react";
-import { jsPDF } from "jspdf"; // named export — works with jsPDF v4+
 
 export default function AnalysisResultView({ result, onBack }) {
   const reportRef = React.useRef(null);
-  const [isGenerating, setIsGenerating] = React.useState(false);
 
   if (!result) return null;
 
@@ -60,153 +55,7 @@ export default function AnalysisResultView({ result, onBack }) {
 
   const cfg = statusConfig[status];
 
-  const handlePrint = () => window.print();
 
-  const handleDownloadPDF = async () => {
-    setIsGenerating(true);
-    try {
-      const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
-      const pageW = doc.internal.pageSize.getWidth();
-      const margin = 18;
-      const contentW = pageW - margin * 2;
-      let y = margin;
-
-      const checkY = (needed = 10) => {
-        if (y + needed > doc.internal.pageSize.getHeight() - margin) {
-          doc.addPage();
-          y = margin;
-        }
-      };
-
-      const addSection = (title, color = [39, 147, 239]) => {
-        checkY(14);
-        doc.setFillColor(...color);
-        doc.roundedRect(margin, y, contentW, 8, 2, 2, "F");
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.setTextColor(255, 255, 255);
-        doc.text(title, margin + 4, y + 5.5);
-        y += 12;
-        doc.setTextColor(30, 41, 59);
-      };
-
-      const addText = (text, size = 10, style = "normal", color = [30, 41, 59]) => {
-        doc.setFont("helvetica", style);
-        doc.setFontSize(size);
-        doc.setTextColor(...color);
-        const lines = doc.splitTextToSize(String(text), contentW);
-        checkY(lines.length * (size * 0.4 + 1) + 2);
-        doc.text(lines, margin, y);
-        y += lines.length * (size * 0.4 + 1) + 2;
-      };
-
-      const addBullet = (text, size = 10) => {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(size);
-        doc.setTextColor(30, 41, 59);
-        const lines = doc.splitTextToSize(String(text), contentW - 8);
-        checkY(lines.length * (size * 0.4 + 1) + 2);
-        doc.setFillColor(39, 147, 239);
-        doc.circle(margin + 2, y - 0.5, 1, "F");
-        doc.text(lines, margin + 6, y);
-        y += lines.length * (size * 0.4 + 1) + 3;
-      };
-
-      const addDivider = () => {
-        checkY(6);
-        doc.setDrawColor(226, 232, 240);
-        doc.setLineWidth(0.3);
-        doc.line(margin, y, pageW - margin, y);
-        y += 5;
-      };
-
-      // ── HEADER ──
-      doc.setFillColor(39, 147, 239);
-      doc.rect(0, 0, pageW, 26, "F");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(15);
-      doc.setTextColor(255, 255, 255);
-      doc.text("MedTruth Guard — AI Analysis Report", margin, 12);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.text(`${type} Verification Results`, margin, 19);
-      doc.setFontSize(8);
-      doc.text(`Generated: ${new Date(timestamp).toLocaleDateString()} ${new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, pageW - margin, 19, { align: "right" });
-      y = 36;
-
-      // ── DISCLAIMER ──
-      doc.setFillColor(254, 226, 226);
-      doc.roundedRect(margin, y, contentW, 10, 2, 2, "F");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(185, 28, 28);
-      const dLines = doc.splitTextToSize("⚠  " + disclaimer, contentW - 6);
-      doc.text(dLines, margin + 3, y + 4);
-      y += 14;
-
-      // ── CONFIDENCE ──
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Confidence Score: ${data.confidence_score || 95}%   |   Assessment: ${cfg.label}`, margin, y);
-      y += 8;
-      addDivider();
-
-      // ── KEY OBSERVATIONS ──
-      addSection("KEY OBSERVATIONS");
-      if (Array.isArray(findings) && findings.length > 0) {
-        findings.forEach((item) => addBullet(item));
-      } else if (typeof findings === "object") {
-        Object.entries(findings).forEach(([k, v]) => addBullet(`${k.replace(/_/g, " ")}: ${v}`));
-      } else {
-        addText("No findings recorded.", 10, "italic", [148, 163, 184]);
-      }
-      y += 4;
-
-      // ── CLINICAL IMPRESSIONS ──
-      addSection("CLINICAL IMPRESSIONS", [79, 70, 229]);
-      const impArr = Array.isArray(impressions) ? impressions : [impressions];
-      if (impArr.length > 0 && impArr[0]) {
-        impArr.forEach((item) => {
-          checkY(12);
-          doc.setFillColor(248, 250, 255);
-          doc.roundedRect(margin, y, contentW, 1, 1, 1, "F"); // placeholder
-          addText(item, 10, "normal");
-        });
-      } else {
-        addText("No clinical impressions generated.", 10, "italic", [148, 163, 184]);
-      }
-      y += 4;
-
-      // ── RECOMMENDATIONS ──
-      addSection("SUGGESTED NEXT STEPS", [8, 145, 178]);
-      if (recommendations.length > 0) {
-        recommendations.forEach((item) => addBullet(item));
-      } else {
-        addText("Please consult your doctor for follow-up guidance.", 10, "italic", [148, 163, 184]);
-      }
-      y += 4;
-
-      // ── PATIENT CONTEXT ──
-      addSection("PATIENT CONTEXT APPLIED", [71, 85, 105]);
-      addText(`Age: ${age || "N/A"} | Gender: ${gender || "N/A"} | History: ${history}`, 10);
-      y += 4;
-
-      // ── FOOTER ──
-      addDivider();
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(7.5);
-      doc.setTextColor(148, 163, 184);
-      doc.text(`MedTruth Guard  •  ID: ${result.analysis_id || "PROVISIONAL"}  •  This is NOT a medical diagnosis. For educational/clinical assistance only.`, margin, y);
-
-      doc.save(`MedTruth_Report_${result.analysis_id?.slice(-6) || "Report"}.pdf`);
-    } catch (error) {
-      console.error("PDF Generation failed:", error);
-      alert("PDF generation failed: " + (error?.message || "Unknown error"));
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   const disclaimer = data.disclaimer || "NOT A DIAGNOSIS. FOR EDUCATIONAL/CLINICAL ASSISTANCE ONLY.";
 
@@ -229,24 +78,6 @@ export default function AnalysisResultView({ result, onBack }) {
         >
           <ArrowLeft size={14} /> Back to Dashboard
         </button>
-
-        <div className="flex items-center gap-[8px]">
-          <button
-            onClick={handlePrint}
-            className="w-[36px] h-[36px] flex items-center justify-center border border-[#e2e8f0] rounded-[10px] text-[#64748b] hover:bg-[#f1f5f9] transition-all bg-white shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
-            title="Print Report"
-          >
-            <Printer size={15} />
-          </button>
-          <button
-            onClick={handleDownloadPDF}
-            disabled={isGenerating}
-            className="flex items-center gap-[6px] py-[8px] px-[16px] bg-[#2793ef] text-white rounded-[10px] font-bold text-[13px] hover:bg-[#1a85e2] transition-all shadow-[0_2px_8px_rgba(39,147,239,0.3)] disabled:opacity-60 disabled:cursor-not-allowed min-w-[140px] justify-center"
-          >
-            {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            {isGenerating ? "Generating…" : "Download PDF"}
-          </button>
-        </div>
       </div>
 
       {/* ── Report Card ── */}

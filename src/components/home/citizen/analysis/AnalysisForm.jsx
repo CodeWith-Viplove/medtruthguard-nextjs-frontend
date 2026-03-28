@@ -13,7 +13,7 @@ import {
   Scan,
   AlertTriangle,
 } from "lucide-react";
-import { analyzeEcg, analyzeXray } from "@/lib/api";
+import { analyzeEcg, analyzeXray, ApiError } from "@/lib/api";
 
 export default function AnalysisForm({ citizenId, patientContext, onAnalysisComplete }) {
   const [analysisType, setAnalysisType] = useState("ecg");
@@ -75,7 +75,11 @@ export default function AnalysisForm({ citizenId, patientContext, onAnalysisComp
       removeFile();
     } catch (err) {
       console.error("Analysis error:", err);
-      setError(err.message || "Failed to analyze image.");
+      if (err instanceof ApiError && err.status === 503) {
+        setError("⚠️ The image analysis model is currently at capacity. Please wait a moment and try your analysis again.");
+      } else {
+        setError(err.message || "Failed to analyze image.");
+      }
     } finally {
       setLoading(false);
     }

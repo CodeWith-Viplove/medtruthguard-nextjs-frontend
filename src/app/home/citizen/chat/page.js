@@ -257,10 +257,20 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err) {
       console.error("API Error:", err);
-      const errorContent =
-        err instanceof ApiError && err.body?.detail?.missing_fields
-          ? `⚠️ Patient context incomplete. Please fill in: ${err.body.detail.missing_fields.join(", ")}. Open the Patient Profile panel to update your details.`
-          : `⚠️ Failed to get response: ${err.message}. Please check that the backend server is running and try again.`;
+      let errorContent = "";
+      
+      if (err instanceof ApiError) {
+        if (err.status === 503) {
+          errorContent = "⚠️ The medical verification model is currently experiencing extremely high demand. Please wait a few moments and try your question again.";
+        } else if (err.body?.detail?.missing_fields) {
+          errorContent = `⚠️ Patient context incomplete. Please fill in: ${err.body.detail.missing_fields.join(", ")}. Open the Patient Profile panel to update your details.`;
+        } else {
+          errorContent = `⚠️ Failed to get response: ${err.message}. Please try again shortly.`;
+        }
+      } else {
+        errorContent = `⚠️ Connection error: ${err.message}. Please check your internet and make sure the server is reachable.`;
+      }
+
       setMessages((prev) => [
         ...prev,
         {
