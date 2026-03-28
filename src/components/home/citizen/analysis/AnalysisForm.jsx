@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   X,
   Activity,
@@ -8,13 +8,10 @@ import {
   UploadCloud,
   Loader2,
   Info,
-  User,
   Stethoscope,
-  Heart,
-  Pill,
-  Baby,
   ArrowRight,
-  Plus
+  Scan,
+  AlertTriangle,
 } from "lucide-react";
 import { analyzeEcg, analyzeXray } from "@/lib/api";
 
@@ -27,7 +24,6 @@ export default function AnalysisForm({ citizenId, patientContext, onAnalysisComp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Sync with context
   const [symptoms, setSymptoms] = useState(patientContext?.symptoms || "");
   const [history, setHistory] = useState(patientContext?.history || "");
 
@@ -59,10 +55,7 @@ export default function AnalysisForm({ citizenId, patientContext, onAnalysisComp
     formData.append("image", file);
     formData.append("citizen_id", citizenId);
 
-    if (analysisType === "xray") {
-      formData.append("xray_type", xrayType);
-    }
-
+    if (analysisType === "xray") formData.append("xray_type", xrayType);
     if (patientContext.age) formData.append("age", patientContext.age);
     if (patientContext.gender) formData.append("gender", patientContext.gender);
     if (symptoms) formData.append("symptoms", symptoms);
@@ -89,215 +82,214 @@ export default function AnalysisForm({ citizenId, patientContext, onAnalysisComp
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white border border-[#e8ecf4] rounded-2xl shadow-sm overflow-hidden flex flex-col md:flex-row h-auto md:min-h-[500px]">
-
-      {/* Left Column: Upload & Config */}
-      <div className="md:w-5/12 p-8 border-b md:border-b-0 md:border-r border-slate-100 bg-slate-50/50 flex flex-col gap-8">
-        <div>
-          <h3 className="text-lg font-bold text-slate-900 mb-1">Configuration</h3>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Select analysis type</p>
+    <>
+      {/* Full Preview Modal */}
+      {showFullPreview && (
+        <div
+          className="fixed inset-0 z-[2000] bg-[#0f172a]/70 backdrop-blur-[6px] flex items-center justify-center p-[20px] animate-[fadeIn_0.2s_ease]"
+          onClick={() => setShowFullPreview(false)}
+        >
+          <div
+            className="bg-white rounded-[20px] w-full max-w-[70%] max-h-[88vh] shadow-[0_20px_60px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col animate-[cqModalIn_0.25s_cubic-bezier(0.4,0,0.2,1)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between py-[16px] px-[22px] border-b border-[#e8ecf4] bg-gradient-to-br from-[#f8faff] to-[#f0f4ff]">
+              <div className="flex items-center gap-[10px]">
+                <div className="w-[38px] h-[38px] bg-[#eff6ff] border border-[#bfdbfe] rounded-[10px] flex items-center justify-center text-[#2793ef]">
+                  <ImageIcon size={18} />
+                </div>
+                <div>
+                  <div className="text-[14px] font-bold text-[#0f172a]">Image Inspection</div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-[#94a3b8]">Clinical Pattern Analysis</div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowFullPreview(false)}
+                className="bg-[#f1f5f9] border border-[#e2e8f0] rounded-[10px] w-[34px] h-[34px] flex items-center justify-center cursor-pointer text-[#64748b] transition-all hover:text-[#ef4444] hover:border-[#ef4444] hover:bg-[#fef2f2]"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden bg-[#0f172a] flex items-center justify-center p-[16px]">
+              <img src={preview} alt="Full Assessment View" className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" />
+            </div>
+            <div className="py-[14px] px-[22px] bg-[#f8faff] border-t border-[#e8ecf4] flex items-center justify-between">
+              <div className="flex items-center gap-[10px]">
+                <span className="text-[12px] font-semibold text-[#475569]">{file?.name}</span>
+                <span className="text-[11px] text-[#94a3b8]">{(file?.size / 1024 / 1024).toFixed(2)} MB</span>
+              </div>
+              <div className="flex items-center gap-[5px] text-[10px] font-bold text-[#2793ef] uppercase tracking-widest bg-[#eff6ff] px-[10px] py-[4px] rounded-full border border-[#bfdbfe]">
+                <ShieldCheck size={11} /> Quality Verified
+              </div>
+            </div>
+          </div>
         </div>
+      )}
 
-        <div className="space-y-4">
-          <div className="flex p-1 bg-white border border-slate-200 rounded-xl">
+      <form onSubmit={handleSubmit} className="bg-white border border-[#e8ecf4] rounded-[16px] shadow-[0_1px_6px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col md:flex-row">
+
+        {/* ── Left: Upload & Config ── */}
+        <div className="md:w-[42%] p-[24px] border-b md:border-b-0 md:border-r border-[#f1f5f9] bg-[#f8faff] flex flex-col gap-[20px]">
+          <div>
+            <div className="text-[13px] font-bold text-[#0f172a]">Configuration</div>
+            <div className="text-[11px] font-semibold text-[#94a3b8] uppercase tracking-widest mt-[2px]">Select analysis type</div>
+          </div>
+
+          {/* Type Toggle */}
+          <div className="flex p-[4px] bg-white border border-[#e2e8f0] rounded-[12px] gap-[4px]">
             <button
               type="button"
               onClick={() => setAnalysisType("ecg")}
-              className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${analysisType === "ecg" ? "bg-[#2793ef] text-white shadow-md shadow-blue-100" : "text-slate-500 hover:bg-slate-50"
-                }`}
+              className={`flex-1 py-[10px] px-[14px] rounded-[9px] text-[13px] font-bold flex items-center justify-center gap-[6px] transition-all ${analysisType === "ecg"
+                ? "bg-[#2793ef] text-white shadow-[0_2px_8px_rgba(39,147,239,0.3)]"
+                : "text-[#64748b] hover:bg-[#f1f5f9]"}`}
             >
-              <Activity size={18} /> ECG
+              <Activity size={16} /> ECG
             </button>
             <button
               type="button"
               onClick={() => setAnalysisType("xray")}
-              className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${analysisType === "xray" ? "bg-[#2793ef] text-white shadow-md shadow-blue-100" : "text-slate-500 hover:bg-slate-50"
-                }`}
+              className={`flex-1 py-[10px] px-[14px] rounded-[9px] text-[13px] font-bold flex items-center justify-center gap-[6px] transition-all ${analysisType === "xray"
+                ? "bg-[#2793ef] text-white shadow-[0_2px_8px_rgba(39,147,239,0.3)]"
+                : "text-[#64748b] hover:bg-[#f1f5f9]"}`}
             >
-              <ImageIcon size={18} /> X-ray
+              <Scan size={16} /> X-ray
             </button>
           </div>
 
+          {/* X-ray sub-type */}
           {analysisType === "xray" && (
-            <div className="flex flex-wrap gap-2 animate-[fadeIn_0.3s_ease]">
-              {["chest", "abdomen", "bone"].map(type => (
+            <div className="flex flex-wrap gap-[8px] animate-[fadeIn_0.3s_ease]">
+              {["chest", "abdomen", "bone"].map((type) => (
                 <button
                   key={type}
                   type="button"
                   onClick={() => setXrayType(type)}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest border transition-all ${xrayType === type ? "bg-white border-[#2793ef] text-[#2793ef] ring-4 ring-blue-50" : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"
-                    }`}
+                  className={`px-[14px] py-[7px] rounded-[10px] text-[12px] font-bold uppercase tracking-wider border transition-all ${xrayType === type
+                    ? "bg-white border-[#2793ef] text-[#2793ef] shadow-[0_0_0_3px_rgba(39,147,239,0.08)]"
+                    : "bg-white border-[#e2e8f0] text-[#94a3b8] hover:border-[#2793ef] hover:text-[#2793ef]"}`}
                 >
                   {type}
                 </button>
               ))}
             </div>
           )}
-        </div>
 
-        <div className="flex-1 space-y-3">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Image File</label>
-          {!preview ? (
-            <div className="relative group flex-1 h-32 md:h-full min-h-[160px]">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={onFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
-              />
-              <div className="h-full border-2 border-dashed border-slate-200 rounded-xl bg-white flex flex-col items-center justify-center gap-3 transition-all group-hover:border-[#2793ef] group-hover:bg-blue-50/20">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-slate-300 group-hover:text-[#2793ef] transition-colors">
-                  <UploadCloud size={32} />
-                </div>
-                <div className="text-center">
-                  <p className="text-slate-800 text-xs font-bold">Choose a file</p>
-                  <p className="text-slate-400 text-[10px] font-medium mt-1">PNG, JPEG, DICOM</p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="relative rounded-xl overflow-hidden border border-slate-200 h-32 md:h-full min-h-[160px] group bg-slate-900">
-              <img 
-                src={preview} 
-                alt="Preview" 
-                className="w-full h-full object-contain cursor-pointer transition-opacity group-hover:opacity-80" 
-                onClick={() => setShowFullPreview(true)}
-              />
-              
-              <div className="absolute top-2 right-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={removeFile}
-                  className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg transition-transform hover:scale-110"
-                  title="Remove File"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 60% Width Preview Modal */}
-      {showFullPreview && (
-        <div 
-          className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6 animate-[fadeIn_0.2s_ease]"
-          onClick={() => setShowFullPreview(false)}
-        >
-          <div 
-            className="bg-white rounded-3xl w-full max-w-[60%] max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-[scaleIn_0.3s_ease]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-6 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                 <div className="w-10 h-10 bg-[#e0f2fe] rounded-xl flex items-center justify-center text-[#2793ef]">
-                    <ImageIcon size={20} />
-                 </div>
-                 <div>
-                    <h3 className="text-lg font-bold text-slate-900">Image Inspection</h3>
-                    <p className="text-slate-400 text-[10px] uppercase tracking-widest font-black">Clinical Pattern Analysis</p>
-                 </div>
-              </div>
-              <button 
-                onClick={() => setShowFullPreview(false)}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-500 transition-all"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="flex-1 overflow-hidden bg-slate-900 flex items-center justify-center p-4">
-               <img 
-                 src={preview} 
-                 alt="Full Assessment View" 
-                 className="max-w-full max-h-full object-contain shadow-2xl" 
-               />
-            </div>
-            
-            <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-               <div className="flex items-center gap-3">
-                  <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg shadow-sm">
-                     <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest">{file?.name}</span>
+          {/* File Upload */}
+          <div className="flex-1 flex flex-col gap-[8px]">
+            <div className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-widest">Image File</div>
+            {!preview ? (
+              <div className="relative group flex-1 min-h-[180px]">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={onFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+                />
+                <div className="h-full border-2 border-dashed border-[#e2e8f0] rounded-[14px] bg-white flex flex-col items-center justify-center gap-[10px] transition-all group-hover:border-[#2793ef] group-hover:bg-[#eff6ff]/30 min-h-[180px]">
+                  <div className="w-[52px] h-[52px] rounded-full bg-[#f1f5f9] flex items-center justify-center text-[#94a3b8] group-hover:text-[#2793ef] group-hover:bg-[#eff6ff] transition-all">
+                    <UploadCloud size={26} />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-400">{(file?.size / 1024 / 1024).toFixed(2)} MB</span>
-               </div>
-               
-               <div className="flex items-center gap-2 text-[10px] font-black text-[#2793ef] uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                  <ShieldCheck size={12} /> Institutional Quality Verified
-               </div>
+                  <div className="text-center">
+                    <p className="text-[13px] font-bold text-[#475569]">Drop file here or click to browse</p>
+                    <p className="text-[11px] text-[#94a3b8] mt-[2px]">PNG, JPEG, DICOM supported</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="relative rounded-[14px] overflow-hidden border border-[#e2e8f0] flex-1 min-h-[180px] group bg-[#0f172a]">
+                <img
+                  src={preview}
+                  alt="Preview"
+                  className="w-full h-full object-contain cursor-pointer transition-opacity group-hover:opacity-80 min-h-[180px]"
+                  onClick={() => setShowFullPreview(true)}
+                />
+                <div className="absolute top-[10px] right-[10px]">
+                  <button
+                    type="button"
+                    onClick={removeFile}
+                    className="w-[32px] h-[32px] rounded-full bg-[#ef4444] text-white flex items-center justify-center shadow-lg transition-transform hover:scale-110"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="absolute bottom-[10px] left-[10px] right-[10px]">
+                  <div className="bg-[#0f172a]/70 backdrop-blur-sm rounded-[8px] py-[5px] px-[10px] text-[10px] font-medium text-white text-center">
+                    Click to inspect full size
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Right: Context & Submit ── */}
+        <div className="md:w-[58%] p-[24px] flex flex-col gap-[18px]">
+          <div>
+            <div className="text-[13px] font-bold text-[#0f172a]">Clinical Context</div>
+            <div className="text-[11px] font-semibold text-[#94a3b8] uppercase tracking-widest mt-[2px]">Additional details improve AI accuracy</div>
+          </div>
+
+          <div className="flex flex-col gap-[14px] flex-1">
+            {/* Symptoms */}
+            <div className="flex flex-col gap-[6px]">
+              <label className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider flex items-center gap-[5px]">
+                <Stethoscope size={12} className="text-[#2793ef]" /> Current Symptoms
+              </label>
+              <textarea
+                value={symptoms}
+                onChange={(e) => setSymptoms(e.target.value)}
+                className="w-full bg-[#f8faff] border border-[#e2e8f0] rounded-[12px] py-[12px] px-[14px] text-[13px] text-[#1e293b] outline-none transition-all focus:border-[#2793ef] focus:shadow-[0_0_0_3px_rgba(39,147,239,0.08)] focus:bg-white h-[90px] resize-none placeholder:text-[#94a3b8]"
+                placeholder="e.g. Chest pain, shortness of breath, palpitations…"
+              />
+            </div>
+
+            {/* History */}
+            <div className="flex flex-col gap-[6px]">
+              <label className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider flex items-center gap-[5px]">
+                <Activity size={12} className="text-[#2793ef]" /> Medical History
+              </label>
+              <textarea
+                value={history}
+                onChange={(e) => setHistory(e.target.value)}
+                className="w-full bg-[#f8faff] border border-[#e2e8f0] rounded-[12px] py-[12px] px-[14px] text-[13px] text-[#1e293b] outline-none transition-all focus:border-[#2793ef] focus:shadow-[0_0_0_3px_rgba(39,147,239,0.08)] focus:bg-white h-[90px] resize-none placeholder:text-[#94a3b8]"
+                placeholder="e.g. Prior surgeries, chronic conditions, family history…"
+              />
+            </div>
+
+            {/* Info Notice */}
+            <div className="flex items-center gap-[10px] bg-[#eff6ff] border border-[#bfdbfe] py-[10px] px-[14px] rounded-[12px]">
+              <Info size={14} className="text-[#2793ef] shrink-0" />
+              <p className="text-[12px] text-[#1d4ed8] font-medium leading-[1.5]">
+                AI models use your <span className="font-bold underline cursor-help" title="Age, Gender, Conditions, Medications">Patient Context Profile</span> for higher accuracy. Tap "Patient Profile" to update it.
+              </p>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Right Column: Context & Action */}
-      <div className="md:w-7/12 p-8 flex flex-col gap-6">
-        <div>
-          <h3 className="text-lg font-bold text-slate-900 mb-1">Clinical Context</h3>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Details help AI accuracy</p>
-        </div>
-
-        <div className="space-y-4 flex-1">
-          <div className="space-y-2">
-            <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-1.5 px-1">
-              <Stethoscope size={13} className="text-[#2793ef]" /> Current Symptoms
-            </label>
-            <textarea
-              value={symptoms}
-              onChange={(e) => setSymptoms(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm outline-none focus:border-[#2793ef] focus:bg-white transition-all h-24 resize-none"
-              placeholder="e.g. Chest pain, shortness of breath, palpitations..."
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-1.5 px-1">
-              <Activity size={13} className="text-[#2793ef]" /> Medical History
-            </label>
-            <textarea
-              value={history}
-              onChange={(e) => setHistory(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm outline-none focus:border-[#2793ef] focus:bg-white transition-all h-24 resize-none"
-              placeholder="e.g. Prior surgeries, chronic conditions, family history..."
-            />
-          </div>
-
-          <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 p-4 rounded-xl">
-            <Info size={16} className="text-blue-500 shrink-0" />
-            <p className="text-[12px] text-blue-700 font-medium leading-normal">
-              AI models use your <span className="font-bold underline cursor-help" title="Age, Gender, Weight, Conditions">Patient Context Profile</span> for higher accuracy. Ensure it's updated.
-            </p>
-          </div>
-        </div>
-
-        {error && (
-          <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 animate-[fadeIn_0.3s_ease]">
-            <X size={18} className="text-red-500 shrink-0" />
-            <p className="text-xs font-bold text-red-600">{error}</p>
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading || !file}
-          className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all ${loading || !file
-              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-              : "bg-[#2793ef] text-white shadow-lg shadow-blue-200 hover:bg-[#1a85e2] hover:-translate-y-0.5 active:translate-y-0"
-            }`}
-        >
-          {loading ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              Processing Image...
-            </>
-          ) : (
-            <>
-              Analyze Scan <ArrowRight size={18} />
-            </>
+          {/* Error */}
+          {error && (
+            <div className="flex items-center gap-[10px] bg-[#fef2f2] border border-[#fca5a5] py-[10px] px-[14px] rounded-[12px] animate-[fadeIn_0.3s_ease]">
+              <AlertTriangle size={15} className="text-[#ef4444] shrink-0" />
+              <p className="text-[12px] font-semibold text-[#dc2626]">{error}</p>
+            </div>
           )}
-        </button>
-      </div>
-    </form>
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading || !file}
+            className={`w-full py-[13px] rounded-[12px] text-[14px] font-bold flex items-center justify-center gap-[8px] transition-all duration-200 ${loading || !file
+              ? "bg-[#f1f5f9] text-[#94a3b8] cursor-not-allowed"
+              : "bg-[#2793ef] text-white shadow-[0_4px_14px_rgba(39,147,239,0.35)] hover:bg-[#1a85e2] hover:-translate-y-[1px] hover:shadow-[0_6px_18px_rgba(39,147,239,0.45)] active:translate-y-0"}`}
+          >
+            {loading ? (
+              <><Loader2 size={17} className="animate-spin" /> Processing Image…</>
+            ) : (
+              <>Analyze Scan <ArrowRight size={17} /></>
+            )}
+          </button>
+        </div>
+      </form>
+    </>
   );
 }

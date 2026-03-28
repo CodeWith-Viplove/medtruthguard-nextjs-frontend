@@ -270,11 +270,133 @@ const DetailPanel = ({ item, onClose, onBackToChat }) => {
                     </div>
                     <p className="text-[13px] text-[#334155] leading-[1.6] m-0">{item.verification.justification}</p>
                   </div>
-                  <div className="flex flex-wrap gap-[6px] py-[10px] px-[16px] border-t border-[#f1f5f9]">
-                    {(item.verification.sources || []).map((s, i) => (
-                      <span key={i} className="text-[11px] font-medium py-[3px] px-[10px] rounded-[12px] bg-[#eff6ff] text-[#3b82f6] border border-[#bfdbfe]">{s}</span>
-                    ))}
-                  </div>
+                  {/* ── VERIFICATION SOURCES ── */}
+                  {(() => {
+                    const verification = item.verification || {};
+                    const sources = verification.verification_sources;
+                    const citations = verification.sources || [];
+                    const pmids = (item.aiResponse || {}).pmids || [];
+
+                    if (!sources && citations.length === 0 && pmids.length === 0) return null;
+
+                    const badgeColors = [
+                      { bg: "bg-[#f0f9ff]", text: "text-[#0369a1]", border: "border-[#e0f2fe]", dot: "bg-[#0369a1]" }, // Blue
+                      { bg: "bg-[#f0fdf4]", text: "text-[#15803d]", border: "border-[#dcfce7]", dot: "bg-[#15803d]" }, // Green
+                      { bg: "bg-[#fdf4ff]", text: "text-[#a21caf]", border: "border-[#fae8ff]", dot: "bg-[#a21caf]" }, // Fuchsia
+                      { bg: "bg-[#ffedd5]", text: "text-[#c2410c]", border: "border-[#fed7aa]", dot: "bg-[#c2410c]" }, // Orange
+                      { bg: "bg-[#fce7f3]", text: "text-[#be185d]", border: "border-[#fbcfe8]", dot: "bg-[#be185d]" }, // Pink
+                      { bg: "bg-[#f3f4f6]", text: "text-[#374151]", border: "border-[#e5e7eb]", dot: "bg-[#374151]" }, // Gray
+                      { bg: "bg-[#ecfeff]", text: "text-[#0f766e]", border: "border-[#ccfbf1]", dot: "bg-[#0f766e]" }, // Cyan
+                    ];
+
+                    const getLinkText = (link) => {
+                      try {
+                        const url = new URL(link);
+                        let domain = url.hostname.replace(/^www\./, '');
+                        let path = url.pathname === '/' ? '' : url.pathname;
+                        if (path.endsWith('/')) path = path.slice(0, -1);
+                        let text = domain + path;
+                        return text.length > 40 ? text.substring(0, 40) + '...' : text;
+                      } catch (e) {
+                        const clean = link.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+                        return clean.length > 40 ? clean.substring(0, 40) + '...' : clean;
+                      }
+                    };
+
+                    let pubmedLinks = sources?.pubmed?.links || [];
+                    let whoLinks = sources?.who?.links || [];
+
+                    if (pubmedLinks.length === 0) {
+                      pmids.forEach(id => {
+                        pubmedLinks.push(`https://pubmed.ncbi.nlm.nih.gov/${id}/`);
+                      });
+                      citations.forEach(link => {
+                        if (typeof link === 'string' && link.includes('pubmed') && !pubmedLinks.includes(link)) {
+                          pubmedLinks.push(link);
+                        }
+                      });
+                    }
+
+                    if (whoLinks.length === 0) {
+                      citations.forEach(link => {
+                        if (typeof link === 'string' && link.includes('who.int') && !whoLinks.includes(link)) {
+                          whoLinks.push(link);
+                        }
+                      });
+                    }
+
+                    if (pubmedLinks.length === 0 && whoLinks.length === 0 && citations.length === 0) return null;
+
+                    return (
+                      <div className="py-[16px] px-[16px] border-t border-[#f1f5f9] bg-slate-50/50">
+                        <div className="text-[12px] font-bold text-slate-800 mb-[14px]">
+                          Verification Sources
+                        </div>
+
+                        <div className="flex flex-col gap-[16px]">
+                          {/* PubMed Sources */}
+                          {pubmedLinks.length > 0 && (
+                            <div>
+                              <div className="text-[11.5px] font-semibold text-slate-700 mb-[8px]">
+                                PubMed References:
+                              </div>
+                              <div className="flex flex-wrap gap-[8px]">
+                                {pubmedLinks.map((link, i) => {
+                                  const c = badgeColors[i % badgeColors.length];
+                                  return (
+                                    <a key={i} href={link} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-[6px] text-[11.5px] ${c.text} font-medium transition-all ${c.bg} py-[5px] px-[12px] rounded-full border ${c.border} hover:opacity-80 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]`}>
+                                      <span className={`w-[5px] h-[5px] rounded-full ${c.dot}`} />
+                                      {getLinkText(link)}
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* WHO Sources */}
+                          {whoLinks.length > 0 && (
+                            <div>
+                              <div className="text-[11.5px] font-semibold text-slate-700 mb-[8px]">
+                                WHO References:
+                              </div>
+                              <div className="flex flex-wrap gap-[8px]">
+                                {whoLinks.map((link, i) => {
+                                  const c = badgeColors[(i + 2) % badgeColors.length];
+                                  return (
+                                    <a key={i} href={link} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-[6px] text-[11.5px] ${c.text} font-medium transition-all ${c.bg} py-[5px] px-[12px] rounded-full border ${c.border} hover:opacity-80 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]`}>
+                                      <span className={`w-[5px] h-[5px] rounded-full ${c.dot}`} />
+                                      {getLinkText(link)}
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Other/External Sources fallback */}
+                          {pubmedLinks.length === 0 && whoLinks.length === 0 && citations.length > 0 && (
+                            <div>
+                              <div className="text-[11.5px] font-semibold text-slate-700 mb-[8px]">
+                                External References:
+                              </div>
+                              <div className="flex flex-wrap gap-[8px]">
+                                {citations.map((link, i) => {
+                                  const c = badgeColors[(i + 4) % badgeColors.length];
+                                  return (
+                                    <a key={i} href={typeof link === 'string' ? link : '#'} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-[6px] text-[11.5px] ${c.text} font-medium transition-all ${c.bg} py-[5px] px-[12px] rounded-full border ${c.border} hover:opacity-80 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]`}>
+                                      <span className={`w-[5px] h-[5px] rounded-full ${c.dot}`} />
+                                      {typeof link === 'string' ? getLinkText(link) : 'Source Link'}
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {item.verification.patientContextStr && (
                     <div className="flex gap-[10px] items-center py-[12px] px-[16px] bg-[#f8faff] border-t border-[#f1f5f9]">
                       <User size={14} className="text-[#3b82f6] shrink-0" />
@@ -326,14 +448,14 @@ export default function DoctorResponsesPage() {
         stored = JSON.parse(localStorage.getItem("medtruth_consultations") || "[]");
       } catch (e) { }
     }
-    
+
     // Filter by citizenId if available. 
     // If citizenId exists in storage, it MUST match the current session user.
     // If it doesn't exist (legacy), we only show it if the user is not logged in (anonymous).
     return stored
       .filter(c => {
         if (c.citizenId) return String(c.citizenId) === String(citizenId);
-        return !citizenId || citizenId === "anonymous"; 
+        return !citizenId || citizenId === "anonymous";
       })
       .map(c => ({
         ...c,
@@ -377,6 +499,7 @@ export default function DoctorResponsesPage() {
             safeLabel: "Doctor Reviewed & Approved",
             justification: cr.doctor_view || "Response has been reviewed by a medical professional.",
             sources: (aiResp?.citations || []).map(c => typeof c === "string" ? c : c.title || ""),
+            verification_sources: aiResp?.verification_sources || null,
             patientContextStr: null,
           } : null,
           tags: isResponded ? ["Doctor Reviewed", "AI Verified"] : ["Awaiting Doctor"],

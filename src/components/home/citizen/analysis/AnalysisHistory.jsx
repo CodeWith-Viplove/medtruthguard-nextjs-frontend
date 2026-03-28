@@ -1,16 +1,14 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { 
-  Activity, 
-  TrendingUp, 
-  ArrowRight,
-  Clock, 
+import {
+  Activity,
+  TrendingUp,
+  ChevronRight,
+  Clock,
   Loader2,
   Calendar,
-  Layers,
   FileSearch,
-  CheckCircle2,
-  ChevronRight
+  Scan,
 } from "lucide-react";
 import { getCitizenImageAnalyses } from "@/lib/api";
 
@@ -26,7 +24,7 @@ export default function AnalysisHistory({ citizenId, onSelectAnalysis }) {
       try {
         const res = await getCitizenImageAnalyses(citizenId);
         const data = Array.isArray(res) ? res : (res?.analyses || []);
-        const sortedData = [...data].sort((a, b) => 
+        const sortedData = [...data].sort((a, b) =>
           new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp)
         );
         setAnalyses(sortedData);
@@ -40,38 +38,39 @@ export default function AnalysisHistory({ citizenId, onSelectAnalysis }) {
     loadHistory();
   }, [citizenId]);
 
-  const filteredAnalyses = analyses.filter(a => {
+  const filteredAnalyses = analyses.filter((a) => {
     const type = (a.analysis_type || a.analysis?.modality || "").toLowerCase();
     return filter === "all" || type.includes(filter);
   });
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 bg-white border border-[#e8ecf4] rounded-2xl">
-         <Loader2 size={32} className="animate-spin text-[#2793ef] mb-4" />
-         <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Loading Clinical Archive...</p>
+      <div className="flex flex-col items-center justify-center py-[48px] bg-white border border-[#e8ecf4] rounded-[16px] shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
+        <div className="w-[48px] h-[48px] rounded-full bg-[#eff6ff] border border-[#bfdbfe] flex items-center justify-center mb-[12px]">
+          <Loader2 size={22} className="animate-spin text-[#2793ef]" />
+        </div>
+        <p className="text-[13px] font-bold text-[#64748b]">Loading Clinical Archive…</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="flex flex-col gap-[18px]">
+      {/* Header Row */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-[12px]">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Imaging History</h2>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Past clinical assessments</p>
+          <div className="text-[15px] font-bold text-[#0f172a]">Imaging History</div>
+          <div className="text-[11px] font-semibold text-[#94a3b8] uppercase tracking-widest mt-[2px]">Past clinical assessments</div>
         </div>
-        
-        <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200">
+        {/* Filter Tabs */}
+        <div className="flex p-[4px] bg-[#f1f5f9] rounded-[10px] border border-[#e2e8f0] gap-[2px]">
           {["all", "ecg", "xray"].map((type) => (
             <button
               key={type}
               onClick={() => setFilter(type)}
-              className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                filter === type
-                  ? "bg-white text-[#2793ef] shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`px-[14px] py-[6px] rounded-[7px] text-[11px] font-bold uppercase tracking-wider transition-all ${filter === type
+                ? "bg-white text-[#2793ef] shadow-sm border border-[#e8ecf4]"
+                : "text-[#64748b] hover:text-[#475569]"}`}
             >
               {type}
             </button>
@@ -79,11 +78,15 @@ export default function AnalysisHistory({ citizenId, onSelectAnalysis }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[14px]">
         {filteredAnalyses.length === 0 ? (
-          <div className="col-span-full py-16 flex flex-col items-center justify-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
-            <FileSearch size={32} className="text-slate-300 mb-3" />
-            <p className="text-slate-500 font-bold text-sm">No analysis records found.</p>
+          <div className="col-span-full py-[60px] flex flex-col items-center justify-center bg-white border border-dashed border-[#e2e8f0] rounded-[16px]">
+            <div className="w-[52px] h-[52px] rounded-full bg-[#f1f5f9] flex items-center justify-center mb-[12px]">
+              <FileSearch size={24} className="text-[#94a3b8]" />
+            </div>
+            <p className="text-[14px] font-bold text-[#475569]">No analysis records found</p>
+            <p className="text-[12px] text-[#94a3b8] mt-[4px]">Upload your first scan to get started</p>
           </div>
         ) : (
           filteredAnalyses.map((analysis, index) => {
@@ -91,33 +94,43 @@ export default function AnalysisHistory({ citizenId, onSelectAnalysis }) {
             const typeLabel = (analysis.analysis_type || data.modality || "Report").toUpperCase();
             const date = new Date(analysis.created_at || analysis.timestamp || Date.now());
             const severity = (data.severity || "Normal").toLowerCase();
-            const isSafe = !severity.includes("severe") && !severity.includes("critical");
-            
+            const isSafe = !severity.includes("severe") && !severity.includes("critical") && !severity.includes("high");
+            const isEcg = typeLabel.includes("ECG");
+
             return (
               <button
                 key={analysis.analysis_id || index}
                 onClick={() => onSelectAnalysis(analysis)}
-                className="group bg-white border border-[#e8ecf4] p-5 rounded-xl text-left transition-all hover:border-[#2793ef] hover:shadow-lg hover:shadow-blue-50 active:scale-[0.98] flex flex-col gap-4 relative overflow-hidden"
+                className="group bg-white border border-[#e8ecf4] py-[18px] px-[18px] rounded-[14px] text-left transition-all duration-200 hover:border-[#2793ef] hover:shadow-[0_4px_16px_rgba(39,147,239,0.1)] hover:-translate-y-[1px] flex flex-col gap-[14px] relative overflow-hidden"
               >
+                {/* Top row */}
                 <div className="flex justify-between items-start">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${typeLabel.includes("ECG") ? "bg-blue-50 text-blue-600" : "bg-indigo-50 text-indigo-600"}`}>
-                    {typeLabel.includes("ECG") ? <Activity size={20} /> : <TrendingUp size={20} />}
+                  <div className={`w-[40px] h-[40px] rounded-[11px] flex items-center justify-center ${isEcg ? "bg-[#eff6ff] text-[#2793ef]" : "bg-[#ede9fe] text-[#7c3aed]"}`}>
+                    {isEcg ? <Activity size={20} /> : <Scan size={20} />}
                   </div>
-                  <div className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter border ${isSafe ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"}`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider py-[3px] px-[8px] rounded-[8px] border ${isSafe
+                    ? "bg-[#ecfdf5] text-[#059669] border-[#a7f3d0]"
+                    : "bg-[#fef2f2] text-[#dc2626] border-[#fca5a5]"}`}>
                     {severity}
-                  </div>
+                  </span>
                 </div>
 
+                {/* Label & Date */}
                 <div>
-                  <h3 className="font-bold text-slate-900 group-hover:text-[#2793ef] transition-colors">{typeLabel} Assessment</h3>
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                    <Calendar size={10} /> {date.toLocaleDateString()} &bull; <Clock size={10} /> {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <div className="text-[14px] font-bold text-[#0f172a] group-hover:text-[#2793ef] transition-colors">{typeLabel} Assessment</div>
+                  <div className="flex items-center gap-[6px] text-[11px] font-medium text-[#94a3b8] mt-[4px]">
+                    <Calendar size={10} />
+                    {date.toLocaleDateString()}
+                    <span className="text-[#cbd5e1]">·</span>
+                    <Clock size={10} />
+                    {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </div>
                 </div>
 
-                <div className="mt-2 pt-3 border-t border-slate-50 flex items-center justify-between text-[11px] font-black text-[#2793ef] uppercase tracking-widest">
+                {/* Footer row */}
+                <div className="pt-[10px] border-t border-[#f1f5f9] flex items-center justify-between text-[11px] font-bold text-[#2793ef] uppercase tracking-widest">
                   View full report
-                  <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight size={13} className="group-hover:translate-x-[3px] transition-transform" />
                 </div>
               </button>
             );

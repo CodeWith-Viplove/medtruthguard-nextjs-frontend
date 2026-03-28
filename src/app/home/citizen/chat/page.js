@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { createMedicalQuery, consultDoctor, mapAiResponseToChat, ApiError } from "@/lib/api";
+import AiResponseCard from "@/components/shared/AiResponseCard";
 import {
   User,
   Heart,
@@ -85,13 +86,22 @@ const statusConfig = {
 };
 
 // ─── Chat Message Component ─────────────────────────────────────────────────────
+const LOADING_TEXTS = [
+  "Analyzing your query…",
+  "Cross-referencing PubMed sources…",
+  "Checking WHO clinical guidelines…",
+  "Running AI verification…",
+  "Evaluating patient context…",
+  "Compiling evidence-based response…",
+];
+
 const ChatMessage = ({ message, onConsult }) => {
   const isUser = message.role === "user";
 
   if (isUser) {
     return (
-      <div className="flex gap-[10px] max-w-[96%] md:max-w-[88%] animate-[fadeInUp_0.3s_ease] self-end flex-row-reverse">
-        <div className="py-[12px] px-[16px] rounded-2xl relative max-w-full bg-[#2793ef] text-white rounded-tr-md shadow-[0_4px_12px_rgba(99,102,241,0.25)]">
+      <div className="flex gap-[10px] max-w-[96%] md:max-w-[78%] animate-[fadeInUp_0.3s_ease] self-end">
+        <div className="py-[12px] px-[16px] rounded-2xl relative bg-[#2793ef] text-white rounded-tr-md shadow-[0_4px_12px_rgba(99,102,241,0.25)]">
           <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
           <span className="block text-[10.5px] mt-[5px] opacity-55">{message.time}</span>
         </div>
@@ -107,126 +117,25 @@ const ChatMessage = ({ message, onConsult }) => {
   const isSafe = verification?.status === "safe";
 
   return (
-    <div className="flex gap-[10px] max-w-[96%] md:max-w-[88%] animate-[fadeInUp_0.3s_ease] self-start">
+    <div className="flex gap-[10px] w-full max-w-[96%] md:max-w-[88%] animate-[fadeInUp_0.3s_ease] self-start">
       <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 bg-gradient-to-br from-sky-500 to-blue-500 text-white">
         <Stethoscope size={16} />
       </div>
-      <div className="flex flex-col gap-[10px] flex-1">
+      <div className="flex flex-col gap-[10px] min-w-0 flex-1">
 
-        {/* Verification Results Card — exact image format */}
+        {/* Shared Verification Results Card */}
         {verification && cfg && (
-          <div className="bg-white border border-[#e8ecf4] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] overflow-hidden animate-[fadeInUp_0.35s_ease] max-w-full">
-            {/* ── Title ── */}
-            <div className="text-[20px] font-bold text-slate-900 pt-[20px] px-[22px]">Verification Results</div>
-
-            {/* ── Status Row ── */}
-            <div className="flex items-center justify-between py-[14px] px-[22px] flex-wrap gap-[8px]">
-              <div className="flex items-center gap-[14px]">
-                <div className={`w-[42px] h-[42px] rounded-full border-2 flex items-center justify-center shrink-0 ${isSafe ? "bg-emerald-50 border-emerald-300 text-emerald-500" : verification.status === "caution" ? "bg-amber-50 border-amber-300 text-amber-500" : "bg-red-50 border-red-300 text-red-500"}`}>
-                  {isSafe && <ShieldCheck size={20} />}
-                  {verification.status === "caution" && <ShieldAlert size={20} />}
-                  {verification.status === "unsafe" && <AlertTriangle size={20} />}
-                </div>
-                <div>
-                  <span className={`inline-block rounded-full text-[11px] font-bold py-[4px] px-[12px] mb-[4px] uppercase tracking-[0.05em] ${isSafe ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : verification.status === "caution" ? "bg-amber-100 text-amber-700 border border-amber-200" : "bg-red-100 text-red-700 border border-red-200"}`}>
-                    {cfg.label}
-                  </span>
-                  <div className={`flex items-center gap-[5px] text-[13px] font-semibold ${isSafe ? "text-emerald-600" : verification.status === "caution" ? "text-amber-600" : "text-red-500"}`}>
-                    {isSafe && <CheckCircle2 size={14} />}
-                    {verification.status === "caution" && <Info size={14} />}
-                    {verification.status === "unsafe" && <AlertTriangle size={14} />}
-
-                    {verification.safeLabel && verification.safeLabel.toLowerCase() !== cfg.label.toLowerCase()
-                      ? verification.safeLabel
-                      : (isSafe ? "Safe for this patient" : verification.status === "caution" ? "Caution advised for this patient" : "Not safe for this patient")}
-                  </div>
-                </div>
-              </div>
-              <span className="text-[12px] text-slate-400 whitespace-nowrap">{message.time}</span>
-            </div>
-
-            {/* ── QUERY ── */}
-            <div className="py-[10px] px-[22px] border-t border-slate-100">
-              <div className="text-[11px] font-bold tracking-[0.08em] uppercase text-slate-500 mb-[6px]">QUERY</div>
-              <p className="text-[14px] text-slate-800 leading-relaxed">{message.queryText}</p>
-            </div>
-
-            {/* ── AI RESPONSE ── */}
-            <div className="py-[10px] px-[22px] border-t border-slate-100">
-              <div className="text-[11px] font-bold tracking-[0.08em] uppercase text-slate-500 mb-[6px]">Medthruth Response</div>
-              <div className="bg-[#f8faff] border border-[#e8ecf4] rounded-[10px] py-[12px] px-[14px]">
-                <p className="text-[13.5px] text-slate-700 leading-relaxed">{message.content}</p>
-              </div>
-            </div>
-
-            {/* ── VERIFICATION JUSTIFICATION ── */}
-            <div className="py-[10px] px-[22px] border-t border-slate-100">
-              <div className="flex items-center gap-[8px] mb-[6px]">
-                <div className="flex items-center gap-[6px] text-[11px] font-bold tracking-[0.08em] uppercase text-[#1d6fa8]">
-                  VERIFICATION JUSTIFICATION
-                </div>
-                <Tag color="blue" className="rounded-full font-bold m-0 px-[8px] tracking-[0.05em] text-[10px]">PUBMED</Tag>
-              </div>
-              <p className="text-[13.5px] text-slate-700 leading-relaxed">{verification.justification}</p>
-            </div>
-
-            {/* ── Source Pills ── */}
-            <div className="flex flex-wrap gap-[8px] p-[8px_22px_14px] border-t border-slate-100">
-              {verification.sources.map((s, i) => (
-                <span key={i} className="border border-slate-300 rounded-full text-[12px] text-slate-700 py-[5px] px-[14px] bg-white">{s}</span>
-              ))}
-            </div>
-
-            {/* ── Patient Context Applied ── */}
-            {verification.patientContextStr && (
-              <div className="flex items-center gap-[12px] bg-[#f8faff] border border-[#e8ecf4] rounded-[10px] mx-[22px] mb-[14px] p-[12px_14px]">
-                <User size={16} className="text-slate-500 shrink-0" />
-                <div>
-                  <div className="text-[13px] font-bold text-slate-800">Patient Context Applied</div>
-                  <div className="text-[12px] text-slate-500 mt-[2px]">{verification.patientContextStr}</div>
-                </div>
-              </div>
-            )}
-
-            {/* ── Recommended Doctors ── */}
-            {message.doctors && message.doctors.length > 0 && (
-              <div className="border-t border-slate-100 p-[14px_22px_18px]">
-                <div className="flex items-center gap-[7px] text-[12px] font-bold tracking-[0.06em] uppercase text-slate-500 mb-[12px]">
-                  <Stethoscope size={14} />
-                  Recommended Doctors
-                </div>
-                <div className="flex flex-col gap-[8px]">
-                  {message.doctors.map((doc, i) => (
-                    <div key={doc.id || i} className="flex items-center gap-[12px] bg-[#f8faff] border border-[#e8ecf4] rounded-[10px] py-[10px] px-[14px] transition-shadow duration-200 hover:shadow-[0_3px_12px_rgba(59,130,246,0.1)] hover:border-blue-200">
-                      <div className="w-[38px] h-[38px] rounded-full bg-[#2793ef] text-white text-[13px] font-bold flex items-center justify-center shrink-0">
-                        {(doc.name || "").split(" ").filter(w => !w.startsWith("Dr")).map(w => w[0]).join("").slice(0, 2)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-bold text-slate-800">{doc.name}</div>
-                        <div className="text-[11.5px] text-[#2793ef] font-medium mt-[1px]">{doc.specialty || doc.specialization}</div>
-                        {doc.reason && <div className="text-[11px] text-slate-500 mt-[1px] overflow-hidden text-ellipsis whitespace-nowrap">{doc.reason}</div>}
-                      </div>
-                      <div className="text-right shrink-0">
-                        {doc.suitability_score != null && (
-                          <div className="text-[12px] text-amber-500 font-bold">Score: {doc.suitability_score}</div>
-                        )}
-                        {doc.rating && <div className="text-[12px] text-amber-500 font-bold">★ {doc.rating}</div>}
-                        {doc.exp && <div className="text-[11px] text-slate-400 mt-[2px]">{doc.exp}</div>}
-                      </div>
-                      <button
-                        className="flex items-center gap-[5px] bg-[#2793ef] border-none rounded-lg text-white text-[11px] font-semibold py-[6px] px-[10px] cursor-pointer shrink-0 transition-all duration-200 shadow-[0_2px_8px_rgba(99,102,241,0.3)] hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(99,102,241,0.4)]"
-                        onClick={() => onConsult && onConsult(doc, message.queryText, message.queryId, message.aiResponse)}
-                        title="Send query to this doctor"
-                      >
-                        <Send size={12} />
-                        Consult
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+            <AiResponseCard
+              queryText={message.queryText}
+              content={message.content}
+              verification={verification}
+              rawAiResponse={message.rawAiResponse}
+              time={message.time}
+              doctors={message.doctors}
+              onConsult={onConsult}
+              queryId={message.queryId}
+              aiResponse={message.aiResponse}
+            />
         )}
 
         {/* Plain AI bubble when no verification */}
@@ -265,6 +174,7 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState(null);
+  const [loadingTextIdx, setLoadingTextIdx] = useState(0);
   const [patientContext, setPatientContext] = useState({
     age: "",
     gender: "Male",
@@ -288,6 +198,15 @@ export default function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // Rotate loading text every 2.5 seconds while loading
+  useEffect(() => {
+    if (!loading) { setLoadingTextIdx(0); return; }
+    const interval = setInterval(() => {
+      setLoadingTextIdx(prev => (prev + 1) % LOADING_TEXTS.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const formatTime = () => {
     return new Date().toLocaleTimeString([], {
@@ -766,19 +685,20 @@ export default function ChatPage() {
               ))
             }
 
-            {/* Simple & Nice Loading */}
+            {/* Dynamic Loading Indicator */}
             {loading && (
-              <div className="flex items-start gap-[12px] animate-[fadeInUp_0.3s_ease]">
-                <div className="w-[34px] h-[34px] rounded-full flex items-center justify-center shrink-0 mt-1 bg-blue-50 text-[#2793ef] border border-blue-100 italic font-bold">
+              <div className="flex items-start gap-[12px] animate-[fadeInUp_0.3s_ease] self-start">
+                <div className="w-[34px] h-[34px] rounded-full flex items-center justify-center shrink-0 mt-1 bg-blue-50 text-[#2793ef] border border-blue-100">
                   <Stethoscope size={18} />
                 </div>
-                <div className="bg-white border border-slate-100 rounded-[18px] rounded-tl-[4px] py-[12px] px-[18px] shadow-[0_2px_12px_rgba(0,0,0,0.05)] flex items-center gap-[12px]">
-                  <div className="flex gap-[4px]">
-                    <div className="w-[6px] h-[6px] rounded-full bg-blue-400 animate-[bounce_1.4s_infinite_0ms]" />
-                    <div className="w-[6px] h-[6px] rounded-full bg-blue-400 animate-[bounce_1.4s_infinite_200ms]" />
-                    <div className="w-[6px] h-[6px] rounded-full bg-blue-400 animate-[bounce_1.4s_infinite_400ms]" />
-                  </div>
-                  {/* <span className="text-[13px] text-slate-400 font-medium">Verifying with medical sources...</span> */}
+                <div className="bg-white border border-slate-100 rounded-[18px] rounded-tl-[4px] py-[11px] px-[18px] shadow-[0_2px_12px_rgba(0,0,0,0.05)] flex items-center gap-[10px] min-w-[220px]">
+
+                  <span
+                    key={loadingTextIdx}
+                    className="text-[12.5px] text-slate-500 font-medium animate-[fadeIn_0.4s_ease]"
+                  >
+                    {LOADING_TEXTS[loadingTextIdx]}
+                  </span>
                 </div>
               </div>
             )}

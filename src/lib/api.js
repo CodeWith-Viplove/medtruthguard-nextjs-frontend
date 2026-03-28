@@ -291,11 +291,8 @@ export function mapAiResponseToChat(backendResponse) {
     const verificationStatus =
         riskLevel === "high" ? "unsafe" : riskLevel === "medium" ? "caution" : "safe";
 
-    const safeLabels = {
-        safe: "Safe for this patient",
-        caution: "Use with caution",
-        unsafe: "Not recommended",
-    };
+    // Built-in disclaimer overrides custom safeLabels UI
+    const safeLabelText = ai.disclaimer || "This is not a substitute for professional medical advice.";
 
     // confidence_score from backend is 0-100
     const confidenceScore = ai.confidence_score != null ? ai.confidence_score : null;
@@ -306,11 +303,12 @@ export function mapAiResponseToChat(backendResponse) {
         medicalAnalysis: ai.medical_analysis || "",
         verification: {
             status: verificationStatus,
-            safeLabel: safeLabels[verificationStatus],
+            safeLabel: safeLabelText,
             justification: ai.medical_analysis || "",
             sources: (ai.citations || []).map((c) =>
                 typeof c === "string" ? c : c.title || JSON.stringify(c)
             ),
+            verification_sources: ai.verification_sources || null,
             patientContextStr: null, // filled in by caller
             confidenceScore,
             requiredSpecialization: ai.required_specialization,

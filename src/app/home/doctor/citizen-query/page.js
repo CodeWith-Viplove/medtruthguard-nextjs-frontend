@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { getDoctorAssignedQueries, submitDoctorReview, getAiResponse } from "@/lib/api";
+import AiResponseCard from "@/components/shared/AiResponseCard";
 import {
   Stethoscope, User, Users, Clock, CheckCircle2, AlertTriangle, ShieldCheck,
   MessageSquare, Send, ArrowLeft, X, Search, Bell, Shield,
@@ -219,52 +220,45 @@ const DetailPanel = ({ item, onRespond, onBackToDashboard }) => {
           </div>
         </div>
 
-        {/* MedTruth AI Analysis — shown to doctor for reference */}
-        {item.ai_response && (item.ai_response.recommendation || item.ai_response.medical_analysis) && (
-          <div className="flex flex-col gap-[8px]">
-            <div className="flex items-center gap-[6px] text-[12px] font-bold text-[#64748b] uppercase tracking-[0.04em]"><Shield size={13} className="text-[#6366f1]" /> MedTruth AI Analysis</div>
-            <div className="bg-[#f8faff] border-[1.5px] border-[#c7d2fe] rounded-[14px] overflow-hidden">
-              <div className="py-[10px] px-[16px] flex items-center justify-between border-b border-[#e0e7ff] bg-gradient-to-r from-[#eef2ff] to-[#f8faff]">
-                <div className="flex items-center gap-[6px] text-[12px] font-bold text-[#6366f1]">
-                  <Sparkles size={13} className="text-[#6366f1]" />
-                  <span>AI Recommendation</span>
-                </div>
-                <div className="flex items-center gap-[8px]">
-                  {item.ai_response.risk_level && (
-                    <span className={`text-[10px] font-bold py-[3px] px-[8px] rounded-[10px] uppercase ${item.ai_response.risk_level === "high" ? "bg-[#fef2f2] text-[#ef4444]" : item.ai_response.risk_level === "medium" ? "bg-[#fffbeb] text-[#f59e0b]" : "bg-[#ecfdf5] text-[#10b981]"}`}>
-                      Risk: {item.ai_response.risk_level}
-                    </span>
-                  )}
-                  {item.ai_response.confidence_score != null && (
-                    <span className="text-[11px] font-semibold text-[#6366f1] bg-[#eef2ff] py-[2px] px-[8px] rounded-[8px]">
-                      Confidence: {item.ai_response.confidence_score}%
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="py-[14px] px-[16px]">
-                <p className="text-[13px] text-[#374151] leading-[1.7] whitespace-pre-wrap m-0">
-                  {item.ai_response.recommendation || item.ai_response.medical_analysis}
-                </p>
-                {item.ai_response.medical_analysis && item.ai_response.recommendation && (
-                  <div className="mt-[10px] pt-[10px] border-t border-[#e0e7ff]">
-                    <div className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-[0.06em] mb-[4px]">Medical Analysis</div>
-                    <p className="text-[12.5px] text-[#64748b] leading-[1.6] m-0">{item.ai_response.medical_analysis}</p>
-                  </div>
-                )}
-              </div>
-              {(item.ai_response.citations || []).length > 0 && (
-                <div className="flex flex-wrap gap-[6px] py-[10px] px-[16px] border-t border-[#e0e7ff]">
-                  {item.ai_response.citations.map((c, i) => (
-                    <span key={i} className="text-[11px] font-medium py-[3px] px-[10px] rounded-[12px] bg-[#eff6ff] text-[#3b82f6] border border-[#bfdbfe]">
-                      {typeof c === "string" ? c : c.title || JSON.stringify(c)}
-                    </span>
-                  ))}
-                </div>
-              )}
+        {/* MedTruth AI Analysis — shown to doctor using the same structured card as citizen chat */}
+        {item.ai_response && (item.ai_response.recommendation || item.ai_response.medical_analysis) && (() => {
+          const ai = item.ai_response;
+          const riskLevel = (ai.risk_level || "low").toLowerCase();
+          const verificationStatus =
+            riskLevel === "high" ? "unsafe" : riskLevel === "medium" ? "caution" : "safe";
+
+          const verification = {
+            status: verificationStatus,
+            safeLabel: ai.disclaimer || "This is not a substitute for professional medical advice.",
+            justification: ai.medical_analysis || "",
+            confidenceScore: ai.confidence_score ?? null,
+            sources: [], // let rawAiResponse.citations handle all source rendering
+            verification_sources: ai.verification_sources || null,
+            patientContextStr: (() => {
+              const ctx = item.patientContext || {};
+              const parts = [];
+              if (ctx.age) parts.push(`Age: ${ctx.age}`);
+              if (ctx.gender) parts.push(ctx.gender);
+              if (ctx.isPregnant) parts.push("Pregnant");
+              if (ctx.conditions?.length) parts.push(...ctx.conditions);
+              return parts.length ? parts.join(" • ") : null;
+            })(),
+          };
+
+          return (
+            <div className="flex flex-col gap-[8px]">
+              <div className="flex items-center gap-[6px] text-[12px] font-bold text-[#64748b] uppercase tracking-[0.04em]"><Shield size={13} className="text-[#6366f1]" /> MedTruth AI Analysis</div>
+              <AiResponseCard
+                queryText={item.query}
+                content={ai.recommendation || ai.medical_analysis}
+                verification={verification}
+                rawAiResponse={ai}
+                compact={true}
+              />
             </div>
-          </div>
-        )}
+          );
+        })()}
+
 
         {/* If already responded */}
         {!isPending ? (
@@ -272,7 +266,7 @@ const DetailPanel = ({ item, onRespond, onBackToDashboard }) => {
             <div className="flex items-center gap-[6px] text-[12px] font-bold text-[#64748b] uppercase tracking-[0.04em]"><CheckCircle2 size={13} className="text-[#10b981]" /> Your Response</div>
             <div className="bg-[#f0fdf4] border-[1.5px] border-[#a7f3d0] rounded-[14px] overflow-hidden">
               <div className="py-[10px] px-[16px] flex items-center justify-between border-b border-[#a7f3d0] bg-white/50">
-                <span className="flex items-center gap-[6px] text-[12px] font-bold text-[#6366f1]"><Sparkles size={12} className="text-[#6366f1]" /> Dr. {item.doctor?.name?.replace("Dr. ", "")}</span>
+                <span className="flex items-center gap-[6px] text-[12px] font-bold text-[#6366f1]"> Dr. {item.doctor?.name?.replace("Dr. ", "")}</span>
                 <span className="flex items-center gap-[4px] text-[11px] text-[#94a3b8]"><Clock size={11} /> {item.respondedAt}</span>
               </div>
               <p className="py-[14px] px-[16px] text-[13.5px] text-[#374151] leading-[1.7] whitespace-pre-wrap m-0">{item.response}</p>
@@ -381,11 +375,11 @@ const DetailPanel = ({ item, onRespond, onBackToDashboard }) => {
         <div className="bg-[#f0f9ff] border border-[#bae6fd] rounded-[12px] py-[14px] px-[16px]">
           <div className="flex items-center gap-[6px] text-[12px] font-bold text-[#0369a1] mb-[6px]"><BookOpen size={13} className="text-[#1d6fa8]" /> Clinical Guidelines Reminder</div>
           <p className="text-[12.5px] text-[#075985] leading-[1.6] my-[0] mx-[0] mb-[10px]">
-            All responses are cross-checked against WHO, ADA, NHS, and CDC clinical guidelines by the MedTruth AI engine before delivery.
+            All responses are cross-checked against WHO, PUBMED clinical guidelines by the MedTruth AI engine before delivery.
             Ensure your recommendations are evidence-based and include escalation criteria where appropriate.
           </p>
           <div className="flex flex-wrap gap-[6px]">
-            {["WHO Clinical Guidelines", "ADA Standards 2024", "NHS Protocols", "CDC Recommendations"].map((s, i) => (
+            {["WHO Clinical Guidelines", "PUBMED"].map((s, i) => (
               <span key={i} className="bg-white border border-[#bae6fd] rounded-[20px] text-[11px] text-[#0369a1] py-[3px] px-[10px]">{s}</span>
             ))}
           </div>
@@ -565,54 +559,85 @@ export default function CitizenQueryPage() {
 
         {/* ── Card List ── */}
         <div className="flex-1 overflow-y-auto py-[20px] px-[28px] max-md:py-[12px] max-md:px-[14px] flex flex-col gap-[12px] bg-white scrollbar-thin scrollbar-thumb-[#cbd5e1] scrollbar-track-transparent">
-          {filtered.length === 0 ? (
+
+          {/* Skeleton loader while fetching */}
+          {loadingApi && (
+            <>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="bg-white border-[1.5px] border-[#e8ecf4] rounded-[14px] py-[18px] px-[20px] flex items-start gap-[14px] animate-pulse">
+                  {/* Avatar skeleton */}
+                  <div className="w-[44px] h-[44px] rounded-full bg-slate-200 shrink-0" />
+                  <div className="flex-1 min-w-0 flex flex-col gap-[8px]">
+                    {/* Top row */}
+                    <div className="flex items-center justify-between gap-[8px]">
+                      <div className="h-[14px] w-[120px] bg-slate-200 rounded-full" />
+                      <div className="flex gap-[5px]">
+                        <div className="h-[20px] w-[60px] bg-slate-200 rounded-full" />
+                        <div className="h-[20px] w-[56px] bg-slate-200 rounded-full" />
+                      </div>
+                    </div>
+                    {/* Patient info row */}
+                    <div className="h-[12px] w-[160px] bg-slate-100 rounded-full" />
+                    {/* Query text */}
+                    <div className="h-[13px] w-full bg-slate-100 rounded-full" />
+                    <div className="h-[13px] w-[70%] bg-slate-100 rounded-full" />
+                    {/* Timestamp */}
+                    <div className="h-[11px] w-[80px] bg-slate-100 rounded-full mt-[2px]" />
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* Real content (only shown when not loading) */}
+          {!loadingApi && filtered.length === 0 && (
             <div className="flex flex-col items-center justify-center gap-[8px] py-[60px] px-[20px] text-center">
               <div className="w-[56px] h-[56px] bg-gradient-to-br from-[#dbeafe] to-[#ede9fe] rounded-[16px] flex items-center justify-center"><MessageSquare size={28} color="#6366f1" /></div>
               <div className="text-[15px] font-bold text-[#0f172a]">No queries found</div>
               <div className="text-[12.5px] text-[#94a3b8] max-w-[320px]">Try adjusting your search or filters</div>
             </div>
-          ) : (
-            filtered.map(item => {
-              const initials = (item.patient || "Patient")
-                .split(" ")
-                .map(w => w[0])
-                .join("")
-                .slice(0, 2);
-              const ctx = item.patientContext || {};
-              return (
-                <div
-                  key={item.id}
-                  className={`group bg-white border-[1.5px] border-[#e8ecf4] rounded-[14px] py-[18px] px-[20px] cursor-pointer transition-all duration-200 flex items-start gap-[14px] relative hover:border-[#bfdbfe] hover:shadow-[0_4px_16px_rgba(59,130,246,0.08)] hover:-translate-y-[1px] ${selectedId === item.id ? "border-[#3b82f6] bg-[#f8faff] shadow-[0_4px_16px_rgba(59,130,246,0.12)]" : ""} ${!item.read ? "before:content-[''] before:absolute before:top-1/2 before:-left-[1px] before:-translate-y-1/2 before:w-[3px] before:h-[28px] before:bg-[#3b82f6] before:rounded-[0_3px_3px_0]" : ""}`}
-                  onClick={() => handleSelect(item.id)}
-                >
-                  <div className="w-[44px] h-[44px] rounded-full bg-[#1f97ef] text-white text-[14px] font-bold flex items-center justify-center shrink-0">{initials}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-[8px] mb-[4px]">
-                      <span className="text-[14px] font-bold text-[#0f172a]">{item.patient || "Unknown Patient"}</span>
-                      <div className="flex gap-[5px] shrink-0">
-                        <span className={`text-[10px] font-semibold py-[3px] px-[8px] rounded-[12px] uppercase tracking-[0.03em] ${item.status === "pending" ? "bg-[#fffbeb] text-[#d97706]" : "bg-[#ecfdf5] text-[#059669]"}`}>
-                          {item.status === "pending" ? "Pending" : "Responded"}
-                        </span>
-                        <span className={`text-[10px] font-semibold py-[3px] px-[8px] rounded-[12px] uppercase tracking-[0.03em] ${(item.urgency || "moderate") === "high" ? "bg-[#fef2f2] text-[#dc2626]" : (item.urgency || "moderate") === "moderate" ? "bg-[#fff7ed] text-[#ea580c]" : "bg-[#f0fdf4] text-[#16a34a]"}`}>
-                          {(item.urgency || "moderate") === "high" ? "⚡ Urgent" : (item.urgency || "moderate") === "moderate" ? "Moderate" : "Routine"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-[12px] text-[#3b82f6] font-medium mb-[6px]">
-                      {ctx.age && `${ctx.age} yrs`}{ctx.gender && ` · ${ctx.gender}`}
-                      {ctx.conditions?.length > 0 && ` · ${ctx.conditions.join(", ")}`}
-                    </div>
-                    <div className="text-[13px] text-[#475569] leading-[1.5] overflow-hidden line-clamp-2">{item.query}</div>
-                    <div className="flex items-center gap-[12px] mt-[8px]">
-                      <span className="flex items-center gap-[4px] text-[11px] text-[#94a3b8]"><Clock size={11} /> {item.sentAt || "Recently"}</span>
-                      {item.note && <span className="flex items-center gap-[4px] text-[11px] text-[#6366f1]"><Info size={11} /> Has note</span>}
+          )}
+
+          {!loadingApi && filtered.map(item => {
+            const initials = (item.patient || "Patient")
+              .split(" ")
+              .map(w => w[0])
+              .join("")
+              .slice(0, 2);
+            const ctx = item.patientContext || {};
+            return (
+              <div
+                key={item.id}
+                className={`group bg-white border-[1.5px] border-[#e8ecf4] rounded-[14px] py-[18px] px-[20px] cursor-pointer transition-all duration-200 flex items-start gap-[14px] relative hover:border-[#bfdbfe] hover:shadow-[0_4px_16px_rgba(59,130,246,0.08)] hover:-translate-y-[1px] ${selectedId === item.id ? "border-[#3b82f6] bg-[#f8faff] shadow-[0_4px_16px_rgba(59,130,246,0.12)]" : ""} ${!item.read ? "before:content-[''] before:absolute before:top-1/2 before:-left-[1px] before:-translate-y-1/2 before:w-[3px] before:h-[28px] before:bg-[#3b82f6] before:rounded-[0_3px_3px_0]" : ""}`}
+                onClick={() => handleSelect(item.id)}
+              >
+                <div className="w-[44px] h-[44px] rounded-full bg-[#1f97ef] text-white text-[14px] font-bold flex items-center justify-center shrink-0">{initials}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-[8px] mb-[4px]">
+                    <span className="text-[14px] font-bold text-[#0f172a]">{item.patient || "Unknown Patient"}</span>
+                    <div className="flex gap-[5px] shrink-0">
+                      <span className={`text-[10px] font-semibold py-[3px] px-[8px] rounded-[12px] uppercase tracking-[0.03em] ${item.status === "pending" ? "bg-[#fffbeb] text-[#d97706]" : "bg-[#ecfdf5] text-[#059669]"}`}>
+                        {item.status === "pending" ? "Pending" : "Responded"}
+                      </span>
+                      <span className={`text-[10px] font-semibold py-[3px] px-[8px] rounded-[12px] uppercase tracking-[0.03em] ${(item.urgency || "moderate") === "high" ? "bg-[#fef2f2] text-[#dc2626]" : (item.urgency || "moderate") === "moderate" ? "bg-[#fff7ed] text-[#ea580c]" : "bg-[#f0fdf4] text-[#16a34a]"}`}>
+                        {(item.urgency || "moderate") === "high" ? "⚡ Urgent" : (item.urgency || "moderate") === "moderate" ? "Moderate" : "Routine"}
+                      </span>
                     </div>
                   </div>
-                  <ChevronRight size={16} className="text-[#cbd5e1] shrink-0 transition-colors duration-200 group-hover:text-[#3b82f6]" />
+                  <div className="text-[12px] text-[#3b82f6] font-medium mb-[6px]">
+                    {ctx.age && `${ctx.age} yrs`}{ctx.gender && ` · ${ctx.gender}`}
+                    {ctx.conditions?.length > 0 && ` · ${ctx.conditions.join(", ")}`}
+                  </div>
+                  <div className="text-[13px] text-[#475569] leading-[1.5] overflow-hidden line-clamp-2">{item.query}</div>
+                  <div className="flex items-center gap-[12px] mt-[8px]">
+                    <span className="flex items-center gap-[4px] text-[11px] text-[#94a3b8]"><Clock size={11} /> {item.sentAt || "Recently"}</span>
+                    {item.note && <span className="flex items-center gap-[4px] text-[11px] text-[#6366f1]"><Info size={11} /> Has note</span>}
+                  </div>
                 </div>
-              );
-            })
-          )}
+                <ChevronRight size={16} className="text-[#cbd5e1] shrink-0 transition-colors duration-200 group-hover:text-[#3b82f6]" />
+              </div>
+            );
+          })}
         </div>
 
         {/* ── Detail Modal ── */}
@@ -646,3 +671,4 @@ export default function CitizenQueryPage() {
     </>
   );
 }
+
