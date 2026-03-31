@@ -77,14 +77,10 @@ export default function Sidebar({ role }) {
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
-  // Close mobile sidebar on route change
-  useEffect(() => {
-    if (isMobile) {
-      setMobileOpen(false);
-    }
-  }, [pathname, isMobile]);
-
   const handleLogout = async () => {
+    if (typeof window !== "undefined") {
+      localStorage.clear();
+    }
     await signOut({ redirect: false });
     router.push("/");
   };

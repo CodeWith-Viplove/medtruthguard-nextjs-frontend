@@ -3,6 +3,7 @@ import React from "react";
 import Sidebar from "@/components/home/Sidebar";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, Suspense } from "react";
+import { useSession } from "next-auth/react";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +31,22 @@ function AuthCleanup() {
 
 export default function HomeLayout({ children }) {
     const pathname = usePathname();
+    const { data: session } = useSession();
 
     // Determine role from URL path
     const role = pathname.startsWith("/home/doctor") ? "doctor" : "citizen";
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        if (session?.user?.role !== "citizen") return;
+
+        const mobile = session?.user?.mobile;
+        if (mobile) {
+            localStorage.setItem("medtruth_citizen_mobile", mobile);
+        } else {
+            localStorage.removeItem("medtruth_citizen_mobile");
+        }
+    }, [session]);
 
     return (
         <Suspense fallback={null}>

@@ -426,7 +426,7 @@ export default function CitizenQueryPage() {
       .filter(s => s.doctor?.id && doctorId && String(s.doctor.id) === String(doctorId))
       .map(c => ({
         ...c,
-        patient: c.patientContext?.age ? `Patient (${c.patientContext.age}y)` : "Anonymous Patient",
+        patient: c.patient_full_name || c.patientName || c.patient || (c.patientContext?.age ? `Patient (${c.patientContext.age}y)` : "Anonymous Patient"),
         urgency: c.urgency || "moderate",
         isFromStorage: true,
         // Map aiResponse (camelCase from chat page) to ai_response (snake_case for detail panel)
@@ -458,7 +458,7 @@ export default function CitizenQueryPage() {
               specialty: session?.user?.specialization || "General",
             },
             doctor_id: doctorId,
-            patient: q.citizen_id || "Patient",
+            patient: q.patient_full_name || q.patient_name || q.citizen_name || q.citizen_id || "Patient",
             status: isResponded ? "responded" : "pending",
             urgency: (aiResp?.risk_level || "low") === "high" ? "high" : (aiResp?.risk_level || "low") === "medium" ? "moderate" : "low",
             query: q.query || "Medical Query",
@@ -671,4 +671,3 @@ export default function CitizenQueryPage() {
     </>
   );
 }
-

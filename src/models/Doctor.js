@@ -1,6 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 
-const LICENSE_REGEX = /^[A-Za-z0-9-]{6,20}$/;
+const LICENSE_REGEX = /^[A-Z]{3,4}\/\d{4}\/\d{4,6}$/;
 
 const DoctorSchema = new Schema(
   {
@@ -10,8 +10,8 @@ const DoctorSchema = new Schema(
       required: true,
       trim: true,
       validate: {
-        validator: (value) => LICENSE_REGEX.test(value),
-        message: "Invalid license number format.",
+        validator: (value) => LICENSE_REGEX.test((value || "").trim().toUpperCase()),
+        message: "License number must match format: e.g. MHMC/2018/123456",
       },
     },
     mobile: { type: String, required: true, trim: true },
@@ -33,7 +33,5 @@ const DoctorSchema = new Schema(
   },
   { timestamps: true }
 );
-
-DoctorSchema.index({ email: 1 }, { unique: true });
 
 export default mongoose.models.Doctor || mongoose.model("Doctor", DoctorSchema);

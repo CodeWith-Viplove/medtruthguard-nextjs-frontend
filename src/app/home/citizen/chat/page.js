@@ -94,6 +94,8 @@ const LOADING_TEXTS = [
   "Evaluating patient context…",
   "Compiling evidence-based response…",
 ];
+const PATIENT_CONTEXT_STORAGE_KEY = "medtruth_patient_context";
+const CITIZEN_MOBILE_STORAGE_KEY = "medtruth_citizen_mobile";
 
 const ChatMessage = ({ message, onConsult }) => {
   const isUser = message.role === "user";
@@ -188,16 +190,68 @@ export default function ChatPage() {
   const [showConditions, setShowConditions] = useState(true);
   const [showMedications, setShowMedications] = useState(true);
   const [contextSaved, setContextSaved] = useState(false);
+  const [hasSavedContext, setHasSavedContext] = useState(false);
+  const [contextDirty, setContextDirty] = useState(false);
   // Consult Modal state
   const [consultModal, setConsultModal] = useState(null); // { doctor, queryText }
   const [consultNote, setConsultNote] = useState("");
   const [consultSent, setConsultSent] = useState(false);
+  const [consultLoading, setConsultLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const hasMeaningfulContext = Boolean(
+    patientContext.age ||
+    patientContext.conditions.length ||
+    patientContext.medications.length ||
+    patientContext.symptoms.trim() ||
+    patientContext.allergies.trim() ||
+    patientContext.history.trim()
+  );
+
+  const updatePatientContext = (updater) => {
+    setPatientContext((prev) =>
+      typeof updater === "function" ? updater(prev) : { ...prev, ...updater }
+    );
+    setContextDirty(true);
+    setContextSaved(false);
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const storedContext = localStorage.getItem(PATIENT_CONTEXT_STORAGE_KEY);
+      if (!storedContext) {
+        setHasSavedContext(false);
+        setContextDirty(false);
+        setSidebarOpen(true);
+        return;
+      }
+
+      const parsed = JSON.parse(storedContext);
+      const hydrated = {
+        age: parsed?.age || "",
+        gender: parsed?.gender || "Male",
+        isPregnant: !!parsed?.isPregnant,
+        conditions: Array.isArray(parsed?.conditions) ? parsed.conditions : [],
+        medications: Array.isArray(parsed?.medications) ? parsed.medications : [],
+        symptoms: parsed?.symptoms || "",
+        allergies: parsed?.allergies || "",
+        history: parsed?.history || "",
+      };
+      setPatientContext(hydrated);
+      setHasSavedContext(true);
+      setContextDirty(false);
+    } catch {
+      localStorage.removeItem(PATIENT_CONTEXT_STORAGE_KEY);
+      setHasSavedContext(false);
+      setContextDirty(false);
+      setSidebarOpen(true);
+    }
+  }, []);
 
   // Rotate loading text every 2.5 seconds while loading
   useEffect(() => {
@@ -218,6 +272,29 @@ export default function ChatPage() {
   const handleSend = async (queryText) => {
     const q = queryText || input.trim();
     if (!q || loading) return;
+
+    if (!hasSavedContext || contextDirty || !hasMeaningfulContext) {
+      let blockReason = "Please update and save your Patient Profile before sending a medical query.";
+      if (hasSavedContext && contextDirty) {
+        blockReason = "Your Patient Profile has unsaved changes. Save Patient Context before sending a medical query.";
+      } else if (hasSavedContext && !hasMeaningfulContext) {
+        blockReason = "Patient Profile is empty. Add details in Patient Profile and save before sending a medical query.";
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: "ai",
+          content: `⚠️ ${blockReason}`,
+          time: formatTime(),
+          verification: null,
+        },
+      ]);
+      setSidebarOpen(true);
+      return;
+    }
+
     setInput("");
     setApiError(null);
 
@@ -294,7 +371,7 @@ export default function ChatPage() {
   };
 
   const toggleCondition = (item) => {
-    setPatientContext((p) => ({
+    updatePatientContext((p) => ({
       ...p,
       conditions: p.conditions.includes(item)
         ? p.conditions.filter((c) => c !== item)
@@ -303,7 +380,7 @@ export default function ChatPage() {
   };
 
   const toggleMedication = (item) => {
-    setPatientContext((p) => ({
+    updatePatientContext((p) => ({
       ...p,
       medications: p.medications.includes(item)
         ? p.medications.filter((m) => m !== item)
@@ -312,7 +389,12 @@ export default function ChatPage() {
   };
 
   const saveContext = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(PATIENT_CONTEXT_STORAGE_KEY, JSON.stringify(patientContext));
+    }
     setContextSaved(true);
+    setHasSavedContext(true);
+    setContextDirty(false);
     // Automatically close the modal after a short delay so the user sees the "Saved!" state
     setTimeout(() => {
       setContextSaved(false);
@@ -325,19 +407,28 @@ export default function ChatPage() {
     setConsultModal({ doctor, queryText, queryId, aiResponse });
     setConsultNote("");
     setConsultSent(false);
+    setConsultLoading(false);
   };
 
   // Send consultation to doctor via backend API
   const handleSendConsult = async () => {
-    if (!consultModal) return;
+    if (!consultModal || consultLoading) return;
+    setConsultLoading(true);
 
     try {
       // Call the real consult API if we have a queryId
       if (consultModal.queryId && consultModal.doctor.id) {
+        const citizenMobile =
+          session?.user?.mobile ||
+          (typeof window !== "undefined"
+            ? localStorage.getItem(CITIZEN_MOBILE_STORAGE_KEY)
+            : null);
+
         await consultDoctor(
           consultModal.queryId,
           consultModal.doctor.id,
-          citizenId
+          citizenId,
+          citizenMobile
         );
       }
     } catch (err) {
@@ -367,6 +458,7 @@ export default function ChatPage() {
       } catch (e) { }
     }
     setConsultSent(true);
+    setConsultLoading(false);
     setTimeout(() => {
       setConsultModal(null);
       router.push("/home/citizen/doctor-responses");
@@ -452,7 +544,7 @@ export default function ChatPage() {
                         placeholder="e.g. 30"
                         value={patientContext.age}
                         onChange={(e) =>
-                          setPatientContext((p) => ({ ...p, age: e.target.value }))
+                          updatePatientContext((p) => ({ ...p, age: e.target.value }))
                         }
                       />
                     </div>
@@ -462,7 +554,7 @@ export default function ChatPage() {
                         className="bg-white border border-slate-300 rounded-lg text-slate-900 py-[10px] px-[12px] text-[13px] w-full outline-none transition-colors duration-200 focus:border-[#2793ef] focus:shadow-[0_0_0_3px_rgba(39,147,239,0.1)] [&_option]:bg-white"
                         value={patientContext.gender}
                         onChange={(e) =>
-                          setPatientContext((p) => ({
+                          updatePatientContext((p) => ({
                             ...p,
                             gender: e.target.value,
                           }))
@@ -479,7 +571,7 @@ export default function ChatPage() {
                   <div
                     className="flex items-center gap-[10px] cursor-pointer select-none"
                     onClick={() =>
-                      setPatientContext((p) => ({
+                      updatePatientContext((p) => ({
                         ...p,
                         isPregnant: !p.isPregnant,
                       }))
@@ -572,7 +664,7 @@ export default function ChatPage() {
                         placeholder="e.g. fever and headache"
                         value={patientContext.symptoms}
                         onChange={(e) =>
-                          setPatientContext((p) => ({ ...p, symptoms: e.target.value }))
+                          updatePatientContext((p) => ({ ...p, symptoms: e.target.value }))
                         }
                       />
                     </div>
@@ -584,7 +676,7 @@ export default function ChatPage() {
                         placeholder="e.g. penicillin, sulfa"
                         value={patientContext.allergies}
                         onChange={(e) =>
-                          setPatientContext((p) => ({ ...p, allergies: e.target.value }))
+                          updatePatientContext((p) => ({ ...p, allergies: e.target.value }))
                         }
                       />
                     </div>
@@ -596,7 +688,7 @@ export default function ChatPage() {
                         placeholder="e.g. no chronic conditions"
                         value={patientContext.history}
                         onChange={(e) =>
-                          setPatientContext((p) => ({ ...p, history: e.target.value }))
+                          updatePatientContext((p) => ({ ...p, history: e.target.value }))
                         }
                       />
                     </div>
@@ -752,7 +844,7 @@ export default function ChatPage() {
               <button
                 className="w-[38px] h-[38px] rounded-[10px] border-none bg-[#2793ef] text-white flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 shadow-[0_3px_10px_rgba(99,102,241,0.3)] hover:not(:disabled):scale-105 hover:not(:disabled):shadow-[0_5px_14px_rgba(99,102,241,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => handleSend()}
-                disabled={!input.trim() || loading}
+                disabled={!input.trim() || loading || !hasSavedContext || contextDirty || !hasMeaningfulContext}
               >
                 {loading ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -770,6 +862,11 @@ export default function ChatPage() {
                 For informational purposes only — not a substitute for medical advice
               </div>
             </div>
+            {(!hasSavedContext || contextDirty || !hasMeaningfulContext) && (
+              <div className="mt-[8px] text-[11px] text-amber-600 font-medium">
+                Update and save Patient Profile to enable medical query messages.
+              </div>
+            )}
           </div>
         </main>
       </div>
@@ -847,12 +944,28 @@ export default function ChatPage() {
                 </div>
 
                 <div className="flex items-center justify-end gap-[10px] p-[16px_22px] border-t border-slate-100">
-                  <button className="bg-[#f8faff] border-[1.5px] border-slate-200 rounded-[10px] text-slate-500 text-[13px] font-semibold py-[9px] px-[18px] cursor-pointer transition-all duration-200 hover:border-slate-400 hover:text-slate-800" onClick={() => setConsultModal(null)}>Cancel</button>
-                  <button className="flex items-center gap-[7px] bg-[#2793ef] border-none rounded-[10px] text-white text-[13px] font-bold py-[9px] px-[22px] cursor-pointer transition-all duration-200 shadow-[0_4px_14px_rgba(99,102,241,0.35)] hover:-translate-y-[1px] hover:shadow-[0_6px_18px_rgba(99,102,241,0.4)] [&.sent]:from-emerald-500 [&.sent]:to-emerald-600" onClick={handleSendConsult}>
-
-                    Send to Doctor
-                  </button>
-                </div>
+                <button
+                  className="bg-[#f8faff] border-[1.5px] border-slate-200 rounded-[10px] text-slate-500 text-[13px] font-semibold py-[9px] px-[18px] cursor-pointer transition-all duration-200 hover:border-slate-400 hover:text-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                  onClick={() => setConsultModal(null)}
+                  disabled={consultLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="flex items-center gap-[7px] bg-[#2793ef] border-none rounded-[10px] text-white text-[13px] font-bold py-[9px] px-[22px] cursor-pointer transition-all duration-200 shadow-[0_4px_14px_rgba(99,102,241,0.35)] hover:-translate-y-[1px] hover:shadow-[0_6px_18px_rgba(99,102,241,0.4)] [&.sent]:from-emerald-500 [&.sent]:to-emerald-600 disabled:opacity-70 disabled:cursor-not-allowed"
+                  onClick={handleSendConsult}
+                  disabled={consultLoading}
+                >
+                  {consultLoading ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Send to Doctor"
+                  )}
+                </button>
+              </div>
               </>
             ) : (
               <div className="flex flex-col items-center gap-[10px] p-[30px_22px] text-center">

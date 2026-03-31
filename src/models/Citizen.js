@@ -17,7 +17,5 @@ const CitizenSchema = new Schema(
   { timestamps: true }
 );
 
-CitizenSchema.index({ email: 1 }, { unique: true });
-
 export default mongoose.models.Citizen ||
   mongoose.model("Citizen", CitizenSchema);

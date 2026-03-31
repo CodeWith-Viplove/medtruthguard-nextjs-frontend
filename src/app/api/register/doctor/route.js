@@ -6,7 +6,7 @@ import Citizen from "@/models/Citizen";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_REGEX = /^[0-9+() -]{8,18}$/;
-const LICENSE_REGEX = /^[A-Za-z0-9-]{6,20}$/;
+const LICENSE_REGEX = /^[A-Z]{3,4}\/\d{4}\/\d{4,6}$/;
 
 export async function POST(request) {
   try {
@@ -43,9 +43,11 @@ export async function POST(request) {
       );
     }
 
-    if (!LICENSE_REGEX.test(licenseNumber)) {
+    const normalizedLicenseNumber = licenseNumber.trim().toUpperCase();
+
+    if (!LICENSE_REGEX.test(normalizedLicenseNumber)) {
       return NextResponse.json(
-        { error: "License number should be 6-20 characters (letters, numbers, hyphen)." },
+        { error: "License number must match format: e.g. MHMC/2018/123456" },
         { status: 400 }
       );
     }
@@ -77,7 +79,7 @@ export async function POST(request) {
 
     const doctor = await Doctor.create({
       name: name.trim(),
-      licenseNumber: licenseNumber?.trim() || "",
+      licenseNumber: normalizedLicenseNumber,
       mobile: mobile.trim(),
       email: normalizedEmail,
       specialization: resolvedSpecialization,
@@ -90,6 +92,22 @@ export async function POST(request) {
       { status: 201 }
     );
   } catch (error) {
+    console.error("Doctor registration failed:", error);
+
+    if (error?.code === 11000) {
+      return NextResponse.json(
+        { error: "An account with this email already exists." },
+        { status: 409 }
+      );
+    }
+
+    if (error?.name === "ValidationError") {
+      return NextResponse.json(
+        { error: error.message || "Invalid registration data." },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Unable to create doctor account." },
       { status: 500 }

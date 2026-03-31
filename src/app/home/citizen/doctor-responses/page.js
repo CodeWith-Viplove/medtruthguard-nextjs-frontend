@@ -474,11 +474,14 @@ export default function DoctorResponsesPage() {
       const aiResp = getAiResponse(q);
       (q.consult_requests || []).forEach(cr => {
         const isResponded = cr.consult_status === "approved" || cr.consult_status === "rejected" || cr.consult_status === "reviewed" || cr.consult_status === "completed";
+        const assignedDoctorName =
+          q.assigned_doctor_name ||
+          (Array.isArray(q.assigned_doctor_names) ? q.assigned_doctor_names[0] : null);
         items.push({
           id: `${q._id || q.query_id}_${cr.doctor_id}`,
           isBackend: true,
           doctor: {
-            name: cr.doctor_name || `Doctor ${cr.doctor_id?.slice(-4) || ""}`,
+            name: cr.doctor_name || assignedDoctorName || `Doctor ${cr.doctor_id?.slice(-4) || ""}`,
             specialty: cr.doctor_specialization || aiResp?.required_specialization || "General",
             hospital: "MedTruth Network",
             rating: null,

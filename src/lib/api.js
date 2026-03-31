@@ -142,16 +142,18 @@ export async function createMedicalQuery(query, citizenId, patientContext = {}) 
  * @param {string}          queryId    – The query_id returned from createMedicalQuery.
  * @param {string|string[]} doctorIds  – Single doctor id or array of doctor ids.
  * @param {string}          citizenId  – Citizen id.
+ * @param {string|null}     citizenMobile – Citizen mobile number.
  *
  * @returns {{ message, query_id, requested_doctor_ids, newly_added_doctor_ids }}
  */
-export async function consultDoctor(queryId, doctorIds, citizenId) {
+export async function consultDoctor(queryId, doctorIds, citizenId, citizenMobile = null) {
     const ids = Array.isArray(doctorIds) ? doctorIds : [doctorIds];
 
     return request("POST", "/medical/consult", {
         query_id: queryId,
         doctor_ids: ids,
         citizen_id: citizenId,
+        citizen_mobile: citizenMobile,
     });
 }
 

@@ -55,6 +55,7 @@ export const authOptions = {
           role,
           status: user.status,
           specialization: user.specialization,
+          mobile: user.mobile || null,
         };
       },
     }),
@@ -77,6 +78,7 @@ export const authOptions = {
         }
         user.id = citizen._id.toString();
         user.role = "citizen";
+        user.mobile = citizen.mobile || null;
       }
       return true;
     },
@@ -85,11 +87,13 @@ export const authOptions = {
         if (account?.provider === "google") {
           token.role = "citizen";
           token.userId = user.id;
+          token.mobile = user.mobile || null;
         } else {
           token.role = user.role;
           token.userId = user.id;
           token.status = user.status;
           token.specialization = user.specialization;
+          token.mobile = user.mobile || null;
         }
       }
       return token;
@@ -100,6 +104,7 @@ export const authOptions = {
         session.user.role = token.role;
         session.user.status = token.status;
         session.user.specialization = token.specialization;
+        session.user.mobile = token.mobile;
       }
       return session;
     },
