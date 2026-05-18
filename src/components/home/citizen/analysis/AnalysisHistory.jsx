@@ -10,12 +10,14 @@ import {
   FileSearch,
   Scan,
 } from "lucide-react";
-import { getCitizenImageAnalyses } from "@/lib/api";
+import { getCitizenImageAnalyses, getImageAnalysis } from "@/lib/api";
 
 export default function AnalysisHistory({ citizenId, onSelectAnalysis }) {
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [selectedId, setSelectedId] = useState(null); // ID being fetched
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     async function loadHistory() {
@@ -100,8 +102,23 @@ export default function AnalysisHistory({ citizenId, onSelectAnalysis }) {
             return (
               <button
                 key={analysis.analysis_id || index}
-                onClick={() => onSelectAnalysis(analysis)}
-                className="group bg-white border border-[#e8ecf4] py-[18px] px-[18px] rounded-[14px] text-left transition-all duration-200 hover:border-[#2793ef] hover:shadow-[0_4px_16px_rgba(39,147,239,0.1)] hover:-translate-y-[1px] flex flex-col gap-[14px] relative overflow-hidden"
+                disabled={detailLoading}
+                onClick={async () => {
+                  const id = analysis.analysis_id;
+                  if (!id) { onSelectAnalysis(analysis); return; }
+                  setSelectedId(id);
+                  setDetailLoading(true);
+                  try {
+                    const full = await getImageAnalysis(id);
+                    onSelectAnalysis(full || analysis);
+                  } catch {
+                    onSelectAnalysis(analysis); // fallback to list data
+                  } finally {
+                    setDetailLoading(false);
+                    setSelectedId(null);
+                  }
+                }}
+                className="group bg-white border border-[#e8ecf4] py-[18px] px-[18px] rounded-[14px] text-left transition-all duration-200 hover:border-[#2793ef] hover:shadow-[0_4px_16px_rgba(39,147,239,0.1)] hover:-translate-y-[1px] flex flex-col gap-[14px] relative overflow-hidden disabled:opacity-70 disabled:cursor-wait"
               >
                 {/* Top row */}
                 <div className="flex justify-between items-start">
@@ -129,7 +146,14 @@ export default function AnalysisHistory({ citizenId, onSelectAnalysis }) {
 
                 {/* Footer row */}
                 <div className="pt-[10px] border-t border-[#f1f5f9] flex items-center justify-between text-[11px] font-bold text-[#2793ef] uppercase tracking-widest">
-                  View full report
+                  {selectedId === analysis.analysis_id && detailLoading ? (
+                    <span className="flex items-center gap-[6px]">
+                      <Loader2 size={12} className="animate-spin" />
+                      Loading…
+                    </span>
+                  ) : (
+                    "View full report"
+                  )}
                   <ChevronRight size={13} className="group-hover:translate-x-[3px] transition-transform" />
                 </div>
               </button>

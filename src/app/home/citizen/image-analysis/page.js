@@ -13,11 +13,15 @@ import {
   Loader2,
   CheckCircle2,
   Scan,
+  History,
+  Calendar,
+  Search,
+  ChevronRight,
+  Clock,
 } from "lucide-react";
 import AnalysisForm from "@/components/home/citizen/analysis/AnalysisForm";
 import AnalysisResultView from "@/components/home/citizen/analysis/AnalysisResultView";
-import AnalysisHistory from "@/components/home/citizen/analysis/AnalysisHistory";
-import { getImageAnalysis } from "@/lib/api";
+import { getImageAnalysis, getCitizenImageAnalyses } from "@/lib/api";
 
 const PRESET_CONDITIONS = [
   "Diabetes Type 1", "Diabetes Type 2", "Hypertension",
@@ -45,6 +49,112 @@ export default function ImageAnalysisPage() {
   const [contextSaved, setContextSaved] = useState(false);
   const [refreshHistory, setRefreshHistory] = useState(0);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // ── History drawer states ──
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState("all"); // all | today | yesterday | week | older
+  const [historySearch, setHistorySearch] = useState("");
+  const [loadingHistoryId, setLoadingHistoryId] = useState(null);
+
+  const fetchHistory = async () => {
+    if (!citizenId || citizenId === "anonymous") return;
+    setHistoryLoading(true);
+    try {
+      const res = await getCitizenImageAnalyses(citizenId);
+      const data = Array.isArray(res) ? res : (res?.analyses || []);
+      const sortedData = [...data].sort((a, b) =>
+        new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp)
+      );
+      setHistoryItems(sortedData);
+    } catch (e) {
+      console.error("History fetch error:", e);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (historyOpen) fetchHistory();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyOpen, refreshHistory]);
+
+  const groupHistoryItems = (items) => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(todayStart.getDate() - 1);
+    const weekStart = new Date(todayStart); weekStart.setDate(todayStart.getDate() - 7);
+
+    const groups = { today: [], yesterday: [], week: [], older: [] };
+    items.forEach((item) => {
+      const d = new Date(item.created_at || item.timestamp);
+      if (d >= todayStart) groups.today.push(item);
+      else if (d >= yesterdayStart) groups.yesterday.push(item);
+      else if (d >= weekStart) groups.week.push(item);
+      else groups.older.push(item);
+    });
+    return groups;
+  };
+
+  const filteredHistory = (() => {
+    let items = historyItems;
+    if (historySearch.trim()) {
+      const q = historySearch.toLowerCase();
+      items = items.filter((i) => {
+        const typeLabel = (i.analysis_type || i.analysis?.modality || "Report").toLowerCase();
+        const severity = (i.analysis?.severity || i.severity || "").toLowerCase();
+        return typeLabel.includes(q) || severity.includes(q);
+      });
+    }
+    if (historyFilter === "all") return items;
+    const groups = groupHistoryItems(items);
+    if (historyFilter === "today") return groups.today;
+    if (historyFilter === "yesterday") return groups.yesterday;
+    if (historyFilter === "week") return groups.week;
+    if (historyFilter === "older") return groups.older;
+    return items;
+  })();
+
+  const groupedFiltered = historyFilter === "all" ? groupHistoryItems(filteredHistory) : null;
+
+  const getSeverityBadge = (item) => {
+    const data = item.analysis || item;
+    const severity = (data.severity || "Normal").toLowerCase();
+    const isSafe = !severity.includes("severe") && !severity.includes("critical") && !severity.includes("high");
+    
+    if (isSafe) {
+      return { color: "#059669", bg: "#ecfdf5", label: severity.toUpperCase() };
+    } else {
+      return { color: "#dc2626", bg: "#fef2f2", label: severity.toUpperCase() };
+    }
+  };
+
+  const formatHistoryTime = (item) => {
+    const d = new Date(item.created_at || item.timestamp);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const handleHistoryItemClick = async (item) => {
+    const analysisId = item.analysis_id || item.id;
+    if (!analysisId) {
+      setActiveAnalysis(item);
+      setHistoryOpen(false);
+      return;
+    }
+    setLoadingHistoryId(analysisId);
+    try {
+      const fullAnalysis = await getImageAnalysis(analysisId);
+      setActiveAnalysis(fullAnalysis || item);
+      setHistoryOpen(false);
+    } catch (err) {
+      console.error("Failed to fetch full analysis details:", err);
+      setActiveAnalysis(item);
+      setHistoryOpen(false);
+    } finally {
+      setLoadingHistoryId(null);
+    }
+  };
 
   const [patientContext, setPatientContext] = useState({
     age: "",
@@ -112,7 +222,7 @@ export default function ImageAnalysisPage() {
     patientContext.medications.length > 0;
 
   return (
-    <div className="flex flex-col h-full font-sans bg-white overflow-hidden">
+    <div className="flex h-full bg-[#f0f4ff] font-sans overflow-hidden relative w-full">
 
       {/* ── Patient Profile Modal ── */}
       {sidebarOpen && (
@@ -252,8 +362,170 @@ export default function ImageAnalysisPage() {
         </div>
       )}
 
-      {/* ── Top Bar ─ consistent with chat/doctor pages ── */}
-      <header className="bg-white border-b border-[#e8ecf4] py-[16px] px-[28px] max-md:pl-[60px] max-md:px-[14px] flex items-center justify-between shrink-0 shadow-[0_1px_6px_rgba(0,0,0,0.04)] flex-wrap gap-[10px]">
+      {/* ── HISTORY PANEL ── */}
+      {historyOpen && (
+        <div className="w-[320px] max-md:hidden flex flex-col bg-white border-r border-slate-200 shadow-[2px_0_12px_rgba(0,0,0,0.05)] overflow-hidden shrink-0 animate-[fadeIn_0.2s_ease]">
+          {/* Panel Header */}
+          <div className="px-[18px] py-[14px] border-b border-slate-100 bg-[#fafbfc] flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-[8px]">
+              <History size={15} className="text-[#2793ef]" />
+              <span className="text-[14px] font-bold text-slate-800">Analysis History</span>
+              {historyItems.length > 0 && (
+                <span className="bg-blue-100 text-blue-600 text-[10px] font-bold rounded-full px-[7px] py-[1px]">{historyItems.length}</span>
+              )}
+            </div>
+            <button onClick={() => setHistoryOpen(false)} className="text-slate-400 hover:text-slate-700 transition-colors p-[4px] rounded-md hover:bg-slate-100">
+              <X size={15} />
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="px-[14px] py-[10px] border-b border-slate-100 shrink-0">
+            <div className="flex items-center gap-[8px] bg-slate-50 border border-slate-200 rounded-[10px] px-[10px] py-[7px]">
+              <Search size={13} className="text-slate-400 shrink-0" />
+              <input
+                className="flex-1 bg-transparent border-none outline-none text-[12px] text-slate-700 placeholder:text-slate-400"
+                placeholder="Search assessments…"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Filter Tabs */}
+          <div className="px-[14px] py-[8px] border-b border-slate-100 flex gap-[6px] flex-wrap shrink-0">
+            {[
+              { key: "all", label: "All" },
+              { key: "today", label: "Today" },
+              { key: "yesterday", label: "Yesterday" },
+              { key: "week", label: "Last 7 Days" },
+              { key: "older", label: "Older" },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setHistoryFilter(tab.key)}
+                className={`text-[11px] font-semibold px-[10px] py-[4px] rounded-full border transition-all duration-150 ${
+                  historyFilter === tab.key
+                    ? "bg-[#2793ef] text-white border-[#2793ef] shadow-[0_2px_6px_rgba(39,147,239,0.3)]"
+                    : "bg-white text-slate-500 border-slate-200 hover:border-blue-400 hover:text-blue-500"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* History List */}
+          <div className="flex-1 overflow-y-auto px-[10px] py-[8px] flex flex-col gap-[4px] scrollbar-thin scrollbar-thumb-[#cbd5e1] scrollbar-track-transparent">
+            {historyLoading ? (
+              <div className="flex flex-col gap-[8px] pt-[8px]">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="bg-slate-100 rounded-[10px] h-[64px] animate-pulse" />
+                ))}
+              </div>
+            ) : filteredHistory.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-[40px] text-center gap-[8px]">
+                <Scan size={28} className="text-slate-300 animate-pulse" />
+                <p className="text-[12px] text-slate-400 font-medium">No assessments found</p>
+              </div>
+            ) : historyFilter === "all" && groupedFiltered ? (
+              // Grouped view
+              Object.entries({ today: "Today", yesterday: "Yesterday", week: "Last 7 Days", older: "Older" }).map(([key, label]) =>
+                groupedFiltered[key]?.length > 0 ? (
+                  <div key={key} className="mb-[4px]">
+                    <div className="flex items-center gap-[6px] px-[6px] py-[6px]">
+                      <Calendar size={11} className="text-slate-400" />
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.06em]">{label}</span>
+                      <div className="flex-1 h-px bg-slate-100" />
+                      <span className="text-[10px] text-slate-400">{groupedFiltered[key].length}</span>
+                    </div>
+                    {groupedFiltered[key].map((item, idx) => {
+                      const badge = getSeverityBadge(item);
+                      const typeLabel = (item.analysis_type || item.analysis?.modality || "Report").toUpperCase();
+                      const isEcg = typeLabel.includes("ECG");
+                      const itemId = item.analysis_id || item.id || idx;
+                      const isItemLoading = loadingHistoryId === item.analysis_id;
+
+                      return (
+                        <div
+                          key={itemId}
+                          onClick={() => handleHistoryItemClick(item)}
+                          className={`bg-slate-50 hover:bg-blue-50 border border-transparent hover:border-blue-200 rounded-[10px] p-[10px_12px] cursor-pointer transition-all duration-150 mb-[3px] group ${
+                            isItemLoading ? "opacity-70 pointer-events-none" : ""
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-[6px] mb-[4px]">
+                            <div className="flex items-center gap-[6px] min-w-0 flex-1">
+                              {isEcg ? <Activity size={12} className="text-[#2793ef] shrink-0" /> : <Scan size={12} className="text-[#7c3aed] shrink-0" />}
+                              <p className="text-[12px] font-bold text-slate-700 leading-snug group-hover:text-slate-900 truncate">{typeLabel} Assessment</p>
+                            </div>
+                            {isItemLoading ? (
+                              <Loader2 size={12} className="animate-spin text-blue-400 shrink-0 mt-[2px]" />
+                            ) : badge && (
+                              <span className="text-[9px] font-bold px-[6px] py-[2px] rounded-full shrink-0" style={{ color: badge.color, background: badge.bg }}>{badge.label}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between mt-[6px]">
+                            <span className="text-[10px] text-slate-400 flex items-center gap-[3px]">
+                              <Clock size={10} />
+                              {formatHistoryTime(item)}
+                            </span>
+                            <span className="text-[10px] text-[#2793ef] font-bold group-hover:translate-x-[2px] transition-transform">Report &rarr;</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null
+              )
+            ) : (
+              // Flat filtered view
+              filteredHistory.map((item, idx) => {
+                const badge = getSeverityBadge(item);
+                const typeLabel = (item.analysis_type || item.analysis?.modality || "Report").toUpperCase();
+                const isEcg = typeLabel.includes("ECG");
+                const itemId = item.analysis_id || item.id || idx;
+                const isItemLoading = loadingHistoryId === item.analysis_id;
+
+                return (
+                  <div
+                    key={itemId}
+                    onClick={() => handleHistoryItemClick(item)}
+                    className={`bg-slate-50 hover:bg-blue-50 border border-transparent hover:border-blue-200 rounded-[10px] p-[10px_12px] cursor-pointer transition-all duration-150 mb-[3px] group ${
+                      isItemLoading ? "opacity-70 pointer-events-none" : ""
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-[6px] mb-[4px]">
+                      <div className="flex items-center gap-[6px] min-w-0 flex-1">
+                        {isEcg ? <Activity size={12} className="text-[#2793ef] shrink-0" /> : <Scan size={12} className="text-[#7c3aed] shrink-0" />}
+                        <p className="text-[12px] font-bold text-slate-700 leading-snug group-hover:text-slate-900 truncate">{typeLabel} Assessment</p>
+                      </div>
+                      {isItemLoading ? (
+                        <Loader2 size={12} className="animate-spin text-blue-400 shrink-0 mt-[2px]" />
+                      ) : badge && (
+                        <span className="text-[9px] font-bold px-[6px] py-[2px] rounded-full shrink-0" style={{ color: badge.color, background: badge.bg }}>{badge.label}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between mt-[6px]">
+                      <span className="text-[10px] text-slate-400 flex items-center gap-[3px]">
+                        <Clock size={10} />
+                        {formatHistoryTime(item)}
+                      </span>
+                      <span className="text-[10px] text-[#2793ef] font-bold group-hover:translate-x-[2px] transition-transform">Report &rarr;</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Main Panel View ── */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-white">
+
+        {/* ── Top Bar ─ consistent with chat/doctor pages ── */}
+        <header className="bg-white border-b border-[#e8ecf4] py-[16px] px-[28px] max-md:pl-[60px] max-md:px-[14px] flex items-center justify-between shrink-0 shadow-[0_1px_6px_rgba(0,0,0,0.04)] flex-wrap gap-[10px]">
         <div className="flex items-center gap-[14px] max-md:gap-[10px]">
           <div className="w-[40px] h-[40px] max-md:w-[34px] max-md:h-[34px] bg-[#2793ef] rounded-[12px] max-md:rounded-[10px] flex items-center justify-center text-white shadow-[0_3px_12px_rgba(39,147,239,0.3)] shrink-0">
             <Scan size={19} className="max-md:hidden" />
@@ -265,6 +537,19 @@ export default function ImageAnalysisPage() {
           </div>
         </div>
         <div className="flex items-center gap-[8px] shrink-0">
+          {/* History Toggle Button */}
+          <button
+            className={`flex items-center gap-[6px] border rounded-lg text-[12px] max-md:text-[11px] font-medium px-[12px] max-md:px-[8px] py-[7px] max-md:py-[5px] cursor-pointer transition-all duration-200 ${
+              historyOpen
+                ? "bg-blue-50 border-blue-400 text-blue-600"
+                : "bg-[#f8faff] border-slate-200 text-slate-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50"
+            }`}
+            onClick={() => setHistoryOpen((v) => !v)}
+          >
+            <History size={13} />
+            <span className="max-md:hidden">History</span>
+          </button>
+
           {/* Context Indicator */}
           {contextFilled && (
             <div className="hidden md:flex items-center gap-[5px] py-[5px] px-[12px] rounded-[20px] text-[11px] font-semibold bg-[#ecfdf5] border border-[#a7f3d0] text-[#059669]">
@@ -325,12 +610,7 @@ export default function ImageAnalysisPage() {
                 onAnalysisComplete={onAnalysisComplete}
               />
 
-              {/* History */}
-              <AnalysisHistory
-                key={refreshHistory}
-                citizenId={citizenId}
-                onSelectAnalysis={handleSelectAnalysis}
-              />
+
             </div>
           ) : (
             <div className="animate-[fadeIn_0.3s_ease]">
@@ -349,6 +629,7 @@ export default function ImageAnalysisPage() {
           </p>
         </footer>
       </main>
+      </div>
     </div>
   );
 }
