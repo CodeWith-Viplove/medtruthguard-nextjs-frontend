@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { createMedicalQuery, consultDoctor, mapAiResponseToChat, ApiError } from "@/lib/api";
+import { createMedicalQuery, consultDoctor, mapAiResponseToChat, ApiError, getCitizenQueries, getQuery } from "@/lib/api";
 import AiResponseCard from "@/components/shared/AiResponseCard";
 import {
   User,
@@ -32,6 +32,9 @@ import {
   PanelLeftOpen,
   ChevronDown,
   Loader2,
+  History,
+  Search,
+  Calendar,
 } from "lucide-react";
 import { Tag, Tooltip } from "antd";
 
@@ -162,6 +165,14 @@ export default function ChatPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const citizenId = session?.user?.id || "anonymous";
+
+  // ── History panel state ──
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState("all"); // all | today | yesterday | week | older
+  const [historySearch, setHistorySearch] = useState("");
+  const [loadingHistoryId, setLoadingHistoryId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
@@ -220,6 +231,28 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // Load chat messages from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("medtruth_chat_messages");
+      if (saved) {
+        setMessages(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error("Failed to load saved messages:", e);
+    }
+  }, []);
+
+  // Save chat messages to localStorage when updated
+  useEffect(() => {
+    if (messages.length === 1 && messages[0].id === 1) return;
+    try {
+      localStorage.setItem("medtruth_chat_messages", JSON.stringify(messages));
+    } catch (e) {
+      console.error("Failed to save messages:", e);
+    }
+  }, [messages]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -261,6 +294,184 @@ export default function ChatPage() {
     }, 2500);
     return () => clearInterval(interval);
   }, [loading]);
+
+  // ── Fetch chat query history ──
+  const fetchHistory = async () => {
+    if (!citizenId || citizenId === "anonymous") return;
+    setHistoryLoading(true);
+    try {
+      const data = await getCitizenQueries(citizenId);
+      const list = Array.isArray(data) ? data : data?.queries || [];
+      setHistoryItems(list);
+    } catch (e) {
+      console.error("History fetch error:", e);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (historyOpen) fetchHistory();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyOpen]);
+
+  // ── Group history items by date ──
+  const groupHistoryItems = (items) => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(todayStart.getDate() - 1);
+    const weekStart = new Date(todayStart); weekStart.setDate(todayStart.getDate() - 7);
+
+    const groups = { today: [], yesterday: [], week: [], older: [] };
+    items.forEach((item) => {
+      const d = new Date(item.created_at || item.timestamp || item._id);
+      if (d >= todayStart) groups.today.push(item);
+      else if (d >= yesterdayStart) groups.yesterday.push(item);
+      else if (d >= weekStart) groups.week.push(item);
+      else groups.older.push(item);
+    });
+    return groups;
+  };
+
+  const filteredHistory = (() => {
+    let items = historyItems;
+    if (historySearch.trim()) {
+      const q = historySearch.toLowerCase();
+      items = items.filter((i) => (i.query || "").toLowerCase().includes(q));
+    }
+    if (historyFilter === "all") return items;
+    const groups = groupHistoryItems(items);
+    if (historyFilter === "today") return groups.today;
+    if (historyFilter === "yesterday") return groups.yesterday;
+    if (historyFilter === "week") return groups.week;
+    if (historyFilter === "older") return groups.older;
+    return items;
+  })();
+
+  const groupedFiltered = historyFilter === "all" ? groupHistoryItems(filteredHistory) : null;
+
+  const formatHistoryTime = (item) => {
+    const d = new Date(item.created_at || item.timestamp || item._id);
+    if (isNaN(d)) return "";
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(todayStart.getDate() - 1);
+    if (d >= todayStart) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (d >= yesterdayStart) return `Yesterday ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  };
+
+  const getRiskBadge = (item) => {
+    const risk = (item.ai_response?.risk_level || item.ai_draft_response?.risk_level || "").toLowerCase();
+    if (risk === "high") return { color: "#ef4444", bg: "#fef2f2", label: "High" };
+    if (risk === "medium") return { color: "#f59e0b", bg: "#fffbeb", label: "Medium" };
+    if (risk === "low") return { color: "#10b981", bg: "#ecfdf5", label: "Low" };
+    return null;
+  };
+
+  // ── Load a history query into the chat ──
+  const handleHistoryClick = async (item) => {
+    const queryId = item._id || item.query_id;
+    if (!queryId || loadingHistoryId) return;
+    setLoadingHistoryId(queryId);
+    try {
+      const full = await getQuery(queryId);
+      const src = full || item;
+      const ai = src.ai_response || src.ai_draft_response || {};
+      const queryText = src.query || item.query || "";
+      const ts = src.created_at
+        ? new Date(src.created_at).toLocaleString()
+        : new Date().toLocaleString();
+
+      // Rebuild risk/verification
+      const riskLevel = (ai.risk_level || "low").toLowerCase();
+      const verificationStatus =
+        riskLevel === "high" ? "unsafe" : riskLevel === "medium" ? "caution" : "safe";
+
+      const userMsg = {
+        id: Date.now(),
+        role: "user",
+        content: queryText,
+        time: ts,
+      };
+
+      const aiMsg = {
+        id: Date.now() + 1,
+        role: "ai",
+        content: ai.recommendation || ai.medical_analysis || "",
+        queryText,
+        queryId,
+        time: ts,
+        verification: {
+          status: verificationStatus,
+          safeLabel: ai.disclaimer || "This is not a substitute for professional medical advice.",
+          justification: ai.medical_analysis || "",
+          sources: (ai.citations || []).map((c) =>
+            typeof c === "string" ? c : c.title || JSON.stringify(c)
+          ),
+          verification_sources: ai.verification_sources || null,
+          patientContextStr: null,
+          confidenceScore: ai.confidence_score ?? null,
+          requiredSpecialization: ai.required_specialization,
+        },
+        doctors: (() => {
+          // Use exact same field mapping as doctor-responses/page.js buildBackendItems()
+          const aiResp = src.ai_response || src.ai_draft_response || {};
+          const assignedDoctorName =
+            src.assigned_doctor_name ||
+            (Array.isArray(src.assigned_doctor_names) ? src.assigned_doctor_names[0] : null);
+
+          // Prefer consult_requests — these hold the actual stored doctor info
+          const consults = src.consult_requests || [];
+          if (consults.length > 0) {
+            return consults.map((cr) => ({
+              id: cr.doctor_id,
+              name:
+                cr.doctor_name ||
+                assignedDoctorName ||
+                (cr.doctor_id ? `Doctor ${cr.doctor_id.slice(-4)}` : "Doctor"),
+              specialty:
+                cr.doctor_specialization ||
+                aiResp.required_specialization ||
+                "General",
+              suitability_score: null,
+              reason: null,
+            }));
+          }
+
+          // Fallback: doctor_suggestions (only present on fresh POST response)
+          return (src.doctor_suggestions || []).map((doc) => ({
+            id: doc.id || doc._id || doc.doctor_id,
+            name:
+              doc.name ||
+              doc.doctor_name ||
+              doc.full_name ||
+              [doc.first_name, doc.last_name].filter(Boolean).join(" ") ||
+              "Doctor",
+            specialty: doc.specialization || doc.specialisation || doc.specialty,
+            suitability_score: doc.suitability_score ?? null,
+            reason: doc.reason || null,
+          }));
+        })(),
+        aiResponse: {
+          recommendation: ai.recommendation || "",
+          medical_analysis: ai.medical_analysis || "",
+          risk_level: ai.risk_level || "low",
+          confidence_score: ai.confidence_score ?? null,
+          required_specialization: ai.required_specialization || "",
+          citations: ai.citations || [],
+          disclaimer: ai.disclaimer || "",
+        },
+      };
+
+      setMessages([userMsg, aiMsg]);
+      setHistoryOpen(false);
+    } catch (err) {
+      console.error("Failed to load history query:", err);
+    } finally {
+      setLoadingHistoryId(null);
+    }
+  };
 
   const formatTime = () => {
     return new Date().toLocaleTimeString([], {
@@ -466,6 +677,9 @@ export default function ChatPage() {
   };
 
   const clearChat = () => {
+    try {
+      localStorage.removeItem("medtruth_chat_messages");
+    } catch (e) {}
     setMessages([
       {
         id: 1,
@@ -725,6 +939,141 @@ export default function ChatPage() {
           </div>
         )}
 
+        {/* ── HISTORY PANEL ── */}
+        {historyOpen && (
+          <div className="w-[320px] max-md:hidden flex flex-col bg-white border-r border-slate-200 shadow-[2px_0_12px_rgba(0,0,0,0.05)] overflow-hidden shrink-0">
+            {/* Panel Header */}
+            <div className="px-[18px] py-[14px] border-b border-slate-100 bg-[#fafbfc] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-[8px]">
+                <History size={15} className="text-[#2793ef]" />
+                <span className="text-[14px] font-bold text-slate-800">Chat History</span>
+                {historyItems.length > 0 && (
+                  <span className="bg-blue-100 text-blue-600 text-[10px] font-bold rounded-full px-[7px] py-[1px]">{historyItems.length}</span>
+                )}
+              </div>
+              <button onClick={() => setHistoryOpen(false)} className="text-slate-400 hover:text-slate-700 transition-colors p-[4px] rounded-md hover:bg-slate-100">
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="px-[14px] py-[10px] border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-[8px] bg-slate-50 border border-slate-200 rounded-[10px] px-[10px] py-[7px]">
+                <Search size={13} className="text-slate-400 shrink-0" />
+                <input
+                  className="flex-1 bg-transparent border-none outline-none text-[12px] text-slate-700 placeholder:text-slate-400"
+                  placeholder="Search queries…"
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="px-[14px] py-[8px] border-b border-slate-100 flex gap-[6px] flex-wrap shrink-0">
+              {[
+                { key: "all", label: "All" },
+                { key: "today", label: "Today" },
+                { key: "yesterday", label: "Yesterday" },
+                { key: "week", label: "Last 7 Days" },
+                { key: "older", label: "Older" },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setHistoryFilter(tab.key)}
+                  className={`text-[11px] font-semibold px-[10px] py-[4px] rounded-full border transition-all duration-150 ${
+                    historyFilter === tab.key
+                      ? "bg-[#2793ef] text-white border-[#2793ef] shadow-[0_2px_6px_rgba(39,147,239,0.3)]"
+                      : "bg-white text-slate-500 border-slate-200 hover:border-blue-400 hover:text-blue-500"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* History List */}
+            <div className="flex-1 overflow-y-auto px-[10px] py-[8px] flex flex-col gap-[4px]">
+              {historyLoading ? (
+                <div className="flex flex-col gap-[8px] pt-[8px]">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="bg-slate-100 rounded-[10px] h-[64px] animate-pulse" />
+                  ))}
+                </div>
+              ) : filteredHistory.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-[40px] text-center gap-[8px]">
+                  <MessageSquare size={28} className="text-slate-300" />
+                  <p className="text-[12px] text-slate-400 font-medium">No queries found</p>
+                </div>
+              ) : historyFilter === "all" && groupedFiltered ? (
+                // Grouped view
+                Object.entries({ today: "Today", yesterday: "Yesterday", week: "Last 7 Days", older: "Older" }).map(([key, label]) =>
+                  groupedFiltered[key]?.length > 0 ? (
+                    <div key={key} className="mb-[4px]">
+                      <div className="flex items-center gap-[6px] px-[6px] py-[6px]">
+                        <Calendar size={11} className="text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.06em]">{label}</span>
+                        <div className="flex-1 h-px bg-slate-100" />
+                        <span className="text-[10px] text-slate-400">{groupedFiltered[key].length}</span>
+                      </div>
+                      {groupedFiltered[key].map((item, idx) => {
+                        const badge = getRiskBadge(item);
+                        const itemId = item._id || item.query_id;
+                        const isItemLoading = loadingHistoryId === itemId;
+                        return (
+                          <div
+                            key={itemId || idx}
+                            onClick={() => handleHistoryClick(item)}
+                            className={`bg-slate-50 hover:bg-blue-50 border border-transparent hover:border-blue-200 rounded-[10px] p-[10px_12px] cursor-pointer transition-all duration-150 mb-[3px] group ${
+                              isItemLoading ? "opacity-70 pointer-events-none" : ""
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-[6px] mb-[4px]">
+                              <p className="text-[12px] font-medium text-slate-700 line-clamp-2 leading-snug group-hover:text-slate-900 flex-1">{item.query}</p>
+                              {isItemLoading ? (
+                                <Loader2 size={12} className="animate-spin text-blue-400 shrink-0 mt-[2px]" />
+                              ) : badge && (
+                                <span className="text-[9px] font-bold px-[6px] py-[2px] rounded-full shrink-0" style={{ color: badge.color, background: badge.bg }}>{badge.label}</span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400">{formatHistoryTime(item)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null
+                )
+              ) : (
+                // Flat filtered view
+                filteredHistory.map((item, idx) => {
+                  const badge = getRiskBadge(item);
+                  const itemId = item._id || item.query_id;
+                  const isItemLoading = loadingHistoryId === itemId;
+                  return (
+                    <div
+                      key={itemId || idx}
+                      onClick={() => handleHistoryClick(item)}
+                      className={`bg-slate-50 hover:bg-blue-50 border border-transparent hover:border-blue-200 rounded-[10px] p-[10px_12px] cursor-pointer transition-all duration-150 mb-[3px] group ${
+                        isItemLoading ? "opacity-70 pointer-events-none" : ""
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-[6px] mb-[4px]">
+                        <p className="text-[12px] font-medium text-slate-700 line-clamp-2 leading-snug group-hover:text-slate-900 flex-1">{item.query}</p>
+                        {isItemLoading ? (
+                          <Loader2 size={12} className="animate-spin text-blue-400 shrink-0 mt-[2px]" />
+                        ) : badge && (
+                          <span className="text-[9px] font-bold px-[6px] py-[2px] rounded-full shrink-0" style={{ color: badge.color, background: badge.bg }}>{badge.label}</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-400">{formatHistoryTime(item)}</span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── MAIN CHAT ── */}
         <main className="flex-1 flex flex-col overflow-hidden bg-[#f8faff] relative">
           {/* Chat Header */}
@@ -740,7 +1089,19 @@ export default function ChatPage() {
               </div>
             </div>
             <div className="flex items-center gap-[8px] max-md:gap-[6px] shrink-0">
-              <button className="flex items-center gap-[6px] bg-[#f8faff] border border-slate-200 rounded-lg text-slate-500 text-[12px] max-md:text-[11px] font-medium px-[12px] max-md:px-[8px] py-[7px] max-md:py-[5px] cursor-pointer transition-all duration-200 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 danger [&.danger:hover]:border-red-500 [&.danger:hover]:text-red-500 [&.danger:hover]:bg-red-50 " onClick={clearChat}>
+              {/* History toggle */}
+              <button
+                className={`flex items-center gap-[6px] border rounded-lg text-[12px] max-md:text-[11px] font-medium px-[12px] max-md:px-[8px] py-[7px] max-md:py-[5px] cursor-pointer transition-all duration-200 ${
+                  historyOpen
+                    ? "bg-blue-50 border-blue-400 text-blue-600"
+                    : "bg-[#f8faff] border-slate-200 text-slate-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50"
+                }`}
+                onClick={() => setHistoryOpen((v) => !v)}
+              >
+                <History size={13} />
+                <span className="max-md:hidden">History</span>
+              </button>
+              <button className="flex items-center gap-[6px] bg-[#f8faff] border border-slate-200 rounded-lg text-slate-500 text-[12px] max-md:text-[11px] font-medium px-[12px] max-md:px-[8px] py-[7px] max-md:py-[5px] cursor-pointer transition-all duration-200 hover:border-red-400 hover:text-red-500 hover:bg-red-50" onClick={clearChat}>
                 <Trash2 size={13} />
                 <span className="max-md:hidden">Clear</span>
               </button>
