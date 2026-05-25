@@ -175,6 +175,25 @@ export async function getCitizenQueries(citizenId) {
     return request("GET", `/medical/queries/citizen/${citizenId}`);
 }
 
+/**
+ * Delete a single query from DB.
+ *
+ * DELETE /medical/query/{query_id}?citizen_id={citizen_id}
+ */
+export async function deleteQuery(queryId, citizenId) {
+    return request("DELETE", `/medical/query/${queryId}?citizen_id=${citizenId}`);
+}
+
+/**
+ * Delete all queries of citizen (clear history).
+ *
+ * DELETE /medical/queries/citizen/{citizen_id}
+ */
+export async function deleteCitizenHistory(citizenId) {
+    return request("DELETE", `/medical/queries/citizen/${citizenId}`);
+}
+
+
 // ─── Medical Image Analysis ───
 
 /**
