@@ -10,8 +10,113 @@ import {
   User,
   Stethoscope,
   Send,
+  Activity,
+  BookOpen,
+  Award,
+  Heart,
 } from "lucide-react";
 import { Tag } from "antd";
+
+function EvaluationScoresSection({ scores, type = "pre_review" }) {
+  if (!scores) return null;
+
+  const isPre = type === "pre_review";
+  const title = isPre ? "AI Pre-Review Quality Assessment" : "Doctor Post-Review Quality Assessment";
+  const badgeText = isPre ? "Pre-Review Stage" : "Post-Review Stage";
+  const badgeClass = isPre 
+    ? "bg-[#eff6ff] text-[#2563eb] border-[#bfdbfe]" 
+    : "bg-[#ecfdf5] text-[#059669] border-[#a7f3d0]";
+
+  const metrics = [
+    {
+      key: "medical_reliability_score",
+      label: "Medical Reliability",
+      value: scores.medical_reliability_score,
+      color: "from-sky-500 to-blue-500",
+      textColor: "text-sky-700",
+      bgClass: "bg-sky-50/50 border-sky-100",
+      icon: <Activity size={14} className="text-sky-500" />,
+    },
+    {
+      key: "evidence_score",
+      label: "Evidence Accuracy",
+      value: scores.evidence_score,
+      color: "from-violet-500 to-purple-500",
+      textColor: "text-violet-700",
+      bgClass: "bg-violet-50/50 border-violet-100",
+      icon: <BookOpen size={14} className="text-violet-500" />,
+    },
+    {
+      key: "citation_score",
+      label: "Citation Veracity",
+      value: scores.citation_score,
+      color: "from-indigo-500 to-blue-600",
+      textColor: "text-indigo-700",
+      bgClass: "bg-indigo-50/50 border-indigo-100",
+      icon: <Award size={14} className="text-indigo-500" />,
+    },
+    {
+      key: "safety_score",
+      label: "Clinical Safety",
+      value: scores.safety_score,
+      color: "from-emerald-400 to-green-500",
+      textColor: "text-emerald-700",
+      bgClass: "bg-emerald-50/50 border-emerald-100",
+      icon: <Heart size={14} className="text-emerald-500" />,
+    },
+    {
+      key: "ai_confidence_score",
+      label: "Model Confidence",
+      value: scores.ai_confidence_score,
+      color: "from-amber-500 to-orange-500",
+      textColor: "text-amber-700",
+      bgClass: "bg-amber-50/50 border-amber-100",
+      icon: <Sparkles size={14} className="text-amber-500" />,
+    },
+  ];
+
+  return (
+    <div className={`rounded-xl border p-[16px] transition-all duration-200 hover:shadow-sm ${isPre ? "bg-slate-50/40 border-slate-200" : "bg-emerald-50/10 border-emerald-200"}`}>
+      <div className="flex items-center justify-between mb-[14px]">
+        <div className="flex items-center gap-[8px]">
+          <div className={`w-[6px] h-[6px] rounded-full ${isPre ? "bg-sky-500 animate-pulse" : "bg-emerald-500"}`} />
+          <span className="text-[13px] font-bold text-slate-800 tracking-wide">{title}</span>
+        </div>
+        <span className={`text-[10px] font-bold uppercase tracking-[0.05em] py-[2px] px-[8px] rounded-full border ${badgeClass}`}>
+          {badgeText}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-[10px] mb-[12px]">
+        {metrics.map((m) => {
+          const val = typeof m.value === "number" ? m.value : 0;
+          return (
+            <div key={m.key} className={`flex flex-col gap-[6px] p-[10px] rounded-lg border ${m.bgClass} transition-transform duration-200 hover:-translate-y-[1px]`}>
+              <div className="flex items-center gap-[5px] text-[11px] font-semibold text-slate-500">
+                {m.icon}
+                <span className="truncate">{m.label}</span>
+              </div>
+              <div className="flex items-baseline gap-[2px]">
+                <span className={`text-[18px] font-black ${m.textColor}`}>{val.toFixed(0)}</span>
+                <span className="text-[10px] font-semibold text-slate-400">%</span>
+              </div>
+              <div className="w-full h-[4px] rounded-full bg-slate-200/80 overflow-hidden mt-[2px]">
+                <div className={`h-full rounded-full bg-gradient-to-r ${m.color}`} style={{ width: `${val}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {scores.basis && (
+        <div className={`flex items-start gap-[8px] py-[8px] px-[12px] rounded-lg border text-[11.5px] leading-relaxed text-slate-600 ${isPre ? "bg-white border-slate-100" : "bg-white border-emerald-100"}`}>
+          <Info size={13} className="text-slate-400 shrink-0 mt-[2px]" />
+          <span><strong className="text-slate-700">Clinical Basis: </strong>{scores.basis}</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * AiResponseCard — Shared structured AI response card.
@@ -36,6 +141,7 @@ export default function AiResponseCard({
   onConsult,
   queryId,
   aiResponse,
+  evaluationScores,
 }) {
   if (!verification) return null;
 
@@ -257,6 +363,18 @@ export default function AiResponseCard({
         </div>
       )}
 
+      {/* ── Evaluation Scores (Pre-Review & Post-Review) ── */}
+      {evaluationScores && (evaluationScores.pre_review || evaluationScores.post_review) && (
+        <div className="py-[16px] px-[22px] border-t border-slate-100 flex flex-col gap-[14px]">
+          {evaluationScores.pre_review && (
+            <EvaluationScoresSection scores={evaluationScores.pre_review} type="pre_review" />
+          )}
+          {evaluationScores.post_review && (
+            <EvaluationScoresSection scores={evaluationScores.post_review} type="post_review" />
+          )}
+        </div>
+      )}
+
       {/* ── Verification Sources ── */}
       {hasSources && (
         <div className="py-[16px] px-[22px] border-t border-slate-100 bg-[#f8faff]">
@@ -370,7 +488,7 @@ export default function AiResponseCard({
                 {onConsult && (
                   <button
                     className="flex items-center gap-[5px] bg-[#2793ef] border-none rounded-lg text-white text-[11px] font-semibold py-[6px] px-[10px] cursor-pointer shrink-0 transition-all duration-200 shadow-[0_2px_8px_rgba(99,102,241,0.3)] hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(99,102,241,0.4)]"
-                    onClick={() => onConsult(doc, queryText, queryId, aiResponse)}
+                    onClick={() => onConsult(doc, queryText, queryId, aiResponse, evaluationScores)}
                     title="Send query to this doctor"
                   >
                     <Send size={12} />

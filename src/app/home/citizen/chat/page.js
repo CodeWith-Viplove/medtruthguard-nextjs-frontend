@@ -15,7 +15,6 @@ import {
   Shield,
   ShieldCheck,
   ShieldAlert,
-  Bot,
   Sparkles,
   BookOpen,
   Plus,
@@ -189,6 +188,46 @@ const isGreetingMessage = (text) => {
   return GREETING_PHRASES.has(clean);
 };
 
+const AiProviderErrorCard = ({ details, time }) => {
+  const errorMsg = details.message || "The AI provider could not complete this request.";
+
+  return (
+    <div className="w-full max-w-full rounded-2xl overflow-hidden border border-rose-200 bg-gradient-to-br from-rose-50/90 to-white shadow-[0_4px_16px_rgba(239,68,68,0.08)] animate-[fadeInUp_0.35s_ease] backdrop-blur-sm">
+      {/* Card Header */}
+      <div className="p-[14px_18px] bg-rose-50/30 border-b border-rose-100 flex items-center justify-between">
+        <div className="flex items-center gap-[10px]">
+          <div className="w-[32px] h-[32px] rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+            <ShieldAlert size={16} />
+          </div>
+          <div>
+            <div className="text-[13px] font-bold text-rose-950">AI Model Service Disruption</div>
+            <div className="text-[10px] text-rose-600 font-semibold mt-[1px]">Upstream Fallback Exhausted</div>
+          </div>
+        </div>
+        <span className="text-[9px] font-black uppercase tracking-[0.05em] py-[2px] px-[8px] rounded-full border border-rose-200 bg-rose-50 text-rose-700">
+          HTTP {details.status_code || 500}
+        </span>
+      </div>
+
+      {/* Card Content */}
+      <div className="p-[16px] flex flex-col gap-[12px]">
+        <p className="text-[13px] text-rose-950 font-bold leading-relaxed m-0">
+          ⚠️ {errorMsg}
+        </p>
+        <p className="text-[12px] text-rose-800 leading-relaxed m-0">
+          The MedTruth verification system attempted to route your request through multiple alternative AI models, but the fallback pool was exhausted due to an upstream service limitation.
+        </p>
+      </div>
+      
+      {/* Card Footer */}
+      <div className="p-[8px_16px] bg-rose-50/10 border-t border-rose-100/60 flex items-center justify-between text-[10px] text-rose-500 font-medium">
+        <span>Please try your question again in a few moments</span>
+        <span>{time}</span>
+      </div>
+    </div>
+  );
+};
+
 const ChatMessage = ({ message, onConsult, doctorProfiles = {} }) => {
   const isUser = message.role === "user";
 
@@ -227,6 +266,11 @@ const ChatMessage = ({ message, onConsult, doctorProfiles = {} }) => {
       </div>
       <div className="flex flex-col gap-[10px] min-w-0 flex-1">
 
+        {/* Special Provider Error Card */}
+        {message.providerErrorDetails && (
+          <AiProviderErrorCard details={message.providerErrorDetails} time={message.time} />
+        )}
+
         {/* Shared Verification Results Card (Hidden for greetings) */}
         {verification && cfg && !isGreeting && (
             <AiResponseCard
@@ -239,11 +283,12 @@ const ChatMessage = ({ message, onConsult, doctorProfiles = {} }) => {
               onConsult={onConsult}
               queryId={message.queryId}
               aiResponse={message.aiResponse}
+              evaluationScores={message.evaluationScores}
             />
         )}
 
         {/* Plain AI bubble when no verification OR when query is a greeting */}
-        {(!verification || isGreeting) && (
+        {(!verification || isGreeting) && !message.providerErrorDetails && (
           <div className="py-[12px] px-[16px] rounded-2xl relative max-w-full bg-white text-slate-800 rounded-tl-md shadow-[0_2px_10px_rgba(0,0,0,0.07)] border border-slate-100">
             <div className="flex items-center gap-[5px] mb-[6px]">
               <span className="text-[11px] font-bold text-[#2793ef] tracking-[0.03em] uppercase">
@@ -751,6 +796,7 @@ export default function ChatPage() {
           citations: ai.citations || [],
           disclaimer: ai.disclaimer || "",
         },
+        evaluationScores: src.evaluation_scores || null,
       };
 
       setMessages([userMsg, aiMsg]);
@@ -961,6 +1007,7 @@ export default function ChatPage() {
         doctors: parsed.doctors,
         disclaimer: parsed.disclaimer,
         aiResponse: parsed.aiResponse || null,
+        evaluationScores: parsed.evaluationScores || null,
       };
 
       // 1. Persist directly to localStorage to guarantee updates survive unmounting
@@ -1003,9 +1050,13 @@ export default function ChatPage() {
     } catch (err) {
       console.error("API Error:", err);
       let errorContent = "";
+      let providerErrorDetails = null;
       
       if (err instanceof ApiError) {
-        if (err.status === 503) {
+        if (err.body?.detail?.error === "ai_provider_error") {
+          errorContent = "⚠️ Upstream AI model limit reached or service disruption. Fallback sequence exhausted.";
+          providerErrorDetails = err.body.detail;
+        } else if (err.status === 503) {
           errorContent = "⚠️ The medical verification model is currently experiencing extremely high demand. Please wait a few moments and try your question again.";
         } else if (err.body?.detail?.missing_fields) {
           errorContent = `⚠️ Patient context incomplete. Please fill in: ${err.body.detail.missing_fields.join(", ")}. Open the Patient Profile panel to update your details.`;
@@ -1022,6 +1073,7 @@ export default function ChatPage() {
         content: errorContent,
         time: formatTime(),
         verification: null,
+        providerErrorDetails: providerErrorDetails,
       };
 
       // Persist error to localStorage
@@ -1089,8 +1141,8 @@ export default function ChatPage() {
   };
 
   // Open consultation modal
-  const handleConsult = (doctor, queryText, queryId, aiResponse) => {
-    setConsultModal({ doctor, queryText, queryId, aiResponse });
+  const handleConsult = (doctor, queryText, queryId, aiResponse, evaluationScores) => {
+    setConsultModal({ doctor, queryText, queryId, aiResponse, evaluationScores });
     setConsultNote("");
     setConsultSent(false);
     setConsultLoading(false);
@@ -1137,6 +1189,7 @@ export default function ChatPage() {
         read: false,
         urgency: "moderate",
         aiResponse: consultModal.aiResponse || null,
+        evaluation_scores: consultModal.evaluationScores || null,
       };
       try {
         const existing = JSON.parse(localStorage.getItem("medtruth_consultations") || "[]");
