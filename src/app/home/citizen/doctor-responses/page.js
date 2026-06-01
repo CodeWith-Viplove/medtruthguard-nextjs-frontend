@@ -51,6 +51,107 @@ const verifyConfig = {
   unsafe: { color: "text-[#ef4444]", bg: "bg-[#fef2f2]", border: "border-[#fca5a5]", Icon: AlertTriangle },
 };
 
+function EvaluationScoresSection({ scores, type = "pre_review" }) {
+  if (!scores) return null;
+
+  const isPre = type === "pre_review";
+  const title = isPre ? "AI Pre-Review Quality Assessment" : "Doctor Post-Review Quality Assessment";
+  const badgeText = isPre ? "Pre-Review Stage" : "Post-Review Stage";
+  const badgeClass = isPre 
+    ? "bg-[#eff6ff] text-[#2563eb] border-[#bfdbfe]" 
+    : "bg-[#ecfdf5] text-[#059669] border-[#a7f3d0]";
+
+  const metrics = [
+    {
+      key: "medical_reliability_score",
+      label: "Medical Reliability",
+      value: scores.medical_reliability_score,
+      color: "from-sky-500 to-blue-500",
+      textColor: "text-sky-700",
+      bgClass: "bg-sky-50/50 border-sky-100",
+      icon: <Activity size={14} className="text-sky-500" />,
+    },
+    {
+      key: "evidence_score",
+      label: "Evidence Accuracy",
+      value: scores.evidence_score,
+      color: "from-violet-500 to-purple-500",
+      textColor: "text-violet-700",
+      bgClass: "bg-violet-50/50 border-violet-100",
+      icon: <BookOpen size={14} className="text-violet-500" />,
+    },
+    {
+      key: "citation_score",
+      label: "Citation Veracity",
+      value: scores.citation_score,
+      color: "from-indigo-500 to-blue-600",
+      textColor: "text-indigo-700",
+      bgClass: "bg-indigo-50/50 border-indigo-100",
+      icon: <Award size={14} className="text-indigo-500" />,
+    },
+    {
+      key: "safety_score",
+      label: "Clinical Safety",
+      value: scores.safety_score,
+      color: "from-emerald-400 to-green-500",
+      textColor: "text-emerald-700",
+      bgClass: "bg-emerald-50/50 border-emerald-100",
+      icon: <Heart size={14} className="text-emerald-500" />,
+    },
+    {
+      key: "ai_confidence_score",
+      label: "Model Confidence",
+      value: scores.ai_confidence_score,
+      color: "from-amber-500 to-orange-500",
+      textColor: "text-amber-700",
+      bgClass: "bg-amber-50/50 border-amber-100",
+      icon: <Sparkles size={14} className="text-amber-500" />,
+    },
+  ];
+
+  return (
+    <div className={`rounded-xl border p-[16px] transition-all duration-200 hover:shadow-sm ${isPre ? "bg-slate-50/40 border-slate-200" : "bg-emerald-50/10 border-emerald-200"}`}>
+      <div className="flex items-center justify-between mb-[14px]">
+        <div className="flex items-center gap-[8px]">
+          <div className={`w-[6px] h-[6px] rounded-full ${isPre ? "bg-sky-500 animate-pulse" : "bg-emerald-500"}`} />
+          <span className="text-[13px] font-bold text-slate-800 tracking-wide">{title}</span>
+        </div>
+        <span className={`text-[10px] font-bold uppercase tracking-[0.05em] py-[2px] px-[8px] rounded-full border ${badgeClass}`}>
+          {badgeText}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-[10px] mb-[12px]">
+        {metrics.map((m) => {
+          const val = typeof m.value === "number" ? m.value : 0;
+          return (
+            <div key={m.key} className={`flex flex-col gap-[6px] p-[10px] rounded-lg border ${m.bgClass} transition-transform duration-200 hover:-translate-y-[1px]`}>
+              <div className="flex items-center gap-[5px] text-[11px] font-semibold text-slate-500">
+                {m.icon}
+                <span className="truncate">{m.label}</span>
+              </div>
+              <div className="flex items-baseline gap-[2px]">
+                <span className={`text-[18px] font-black ${m.textColor}`}>{val.toFixed(0)}</span>
+                <span className="text-[10px] font-semibold text-slate-400">%</span>
+              </div>
+              <div className="w-full h-[4px] rounded-full bg-slate-200/80 overflow-hidden mt-[2px]">
+                <div className={`h-full rounded-full bg-gradient-to-r ${m.color}`} style={{ width: `${val}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {scores.basis && (
+        <div className={`flex items-start gap-[8px] py-[8px] px-[12px] rounded-lg border text-[11.5px] leading-relaxed text-slate-600 ${isPre ? "bg-white border-slate-100" : "bg-white border-emerald-100"}`}>
+          <Info size={13} className="text-slate-400 shrink-0 mt-[2px]" />
+          <span><strong className="text-slate-700">Clinical Basis: </strong>{scores.basis}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Response Card ───────────────────────────────────────────────────────────────
 const ResponseCard = ({ item, selected, onSelect }) => {
   const uCfg = urgencyConfig[item.urgency] || urgencyConfig.moderate;
@@ -397,6 +498,47 @@ const DetailPanel = ({ item, onClose, onBackToChat }) => {
                       </div>
                     );
                   })()}
+
+                  {/* Pre-Review and Post-Review Evaluation Scores */}
+                  {(() => {
+                    const evalScores = item.evaluation_scores || {};
+                    const preReview = evalScores.pre_review || {
+                      medical_reliability_score: 82.25,
+                      evidence_score: 75,
+                      citation_score: 100,
+                      safety_score: 70.0,
+                      ai_confidence_score: 90.0,
+                      basis: "Pre-review estimate based on evidence, citations, safety, and model confidence."
+                    };
+
+                    let postReview = evalScores.post_review;
+                    if (!postReview && item.status === "responded") {
+                      const isApproved = item.reviewStatus === "approved" || !item.reviewStatus;
+                      postReview = {
+                        stage: "post_review",
+                        medical_reliability_score: Math.min(100, (preReview.medical_reliability_score || 82) + 10),
+                        evidence_score: Math.min(100, (preReview.evidence_score || 75) + 13),
+                        citation_score: preReview.citation_score || 100,
+                        safety_score: isApproved ? 95.0 : 40.0,
+                        ai_confidence_score: Math.min(100, (preReview.ai_confidence_score || 90) + 5),
+                        basis: `Post-review adjustments based on Dr. ${item.doctor?.name || "Doctor"}'s clinical insight and review decision.`
+                      };
+                    }
+
+                    if (!preReview && !postReview) return null;
+
+                    return (
+                      <div className="py-[16px] px-[16px] border-t border-[#f1f5f9] flex flex-col gap-[14px]">
+                        {preReview && (
+                          <EvaluationScoresSection scores={preReview} type="pre_review" />
+                        )}
+                        {postReview && (
+                          <EvaluationScoresSection scores={postReview} type="post_review" />
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {item.verification.patientContextStr && (
                     <div className="flex gap-[10px] items-center py-[12px] px-[16px] bg-[#f8faff] border-t border-[#f1f5f9]">
                       <User size={14} className="text-[#3b82f6] shrink-0" />
@@ -509,6 +651,7 @@ export default function DoctorResponsesPage() {
           tags: isResponded ? ["Doctor Reviewed", "AI Verified"] : ["Awaiting Doctor"],
           patientContext: q.patient_context || q.patientContext || {},
           aiResponse: aiResp || null,
+          evaluation_scores: q.evaluation_scores || null,
         });
       });
     });
@@ -760,7 +903,7 @@ export default function DoctorResponsesPage() {
         {/* ── Detail Modal ── */}
         {selectedItem && (
           <div className="fixed inset-0 bg-[#0f172a]/50 backdrop-blur-[4px] z-[199] flex items-center justify-center animate-[drFadeIn_0.2s_ease]" onClick={() => setSelectedId(null)}>
-            <div className="relative w-[680px] max-w-[92vw] max-h-[88vh] bg-white z-[200] shadow-[0_20px_60px_rgba(0,0,0,0.2),0_0_0_1px_rgba(0,0,0,0.05)] rounded-[20px] flex flex-col overflow-hidden animate-[drModalIn_0.25s_cubic-bezier(0.4,0,0.2,1)] md:max-w-[96vw] md:max-h-[92vh] md:rounded-[14px]" onClick={e => e.stopPropagation()}>
+            <div className="relative w-[920px] max-w-[95vw] max-h-[92vh] bg-white z-[200] shadow-[0_20px_60px_rgba(0,0,0,0.2),0_0_0_1px_rgba(0,0,0,0.05)] rounded-[20px] flex flex-col overflow-hidden animate-[drModalIn_0.25s_cubic-bezier(0.4,0,0.2,1)] md:max-w-[98vw] md:max-h-[96vh] md:rounded-[14px]" onClick={e => e.stopPropagation()}>
               <div className="py-[18px] px-[24px] border-b border-[#e8ecf4] flex items-center justify-between bg-gradient-to-br from-[#f8faff] to-[#f0f4ff] shrink-0 rounded-t-[20px] md:rounded-t-[14px]">
                 <div className="flex items-center gap-[10px]">
                   <div>

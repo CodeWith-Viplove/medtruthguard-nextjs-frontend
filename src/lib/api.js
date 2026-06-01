@@ -346,6 +346,7 @@ export function mapAiResponseToChat(backendResponse) {
         },
         doctors,
         disclaimer: ai.disclaimer || "This is not a substitute for professional medical advice.",
+        evaluationScores: backendResponse.evaluation_scores || null,
     };
 }
 
